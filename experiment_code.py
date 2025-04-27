@@ -1,10 +1,10 @@
 """
-Streamlit app · Probability‐Word Interpretation + “Wavelength” Game
+Streamlit app · Probability-Word Interpretation + “Wavelength” Game
 ------------------------------------------------------------------
 • Data are reliably appended to a Google Sheet via gspread.  
 • Numeric routing stages (0–1–2–3).  
-• Auto‐scroll to top in Stage 2 and disabled‐slider preview of chosen interval.  
-• Migrates any old string‐based stage in session_state to numeric.
+• Auto-scroll to top in Stage 2 and disabled-slider preview of chosen interval.  
+• Migrates any old string-based stage in session_state to numeric.
 """
 
 import streamlit as st
@@ -15,7 +15,7 @@ import uuid
 import gspread
 from google.oauth2.service_account import Credentials
 
-# ─── migrate old string stages ("INTRO", etc.) to numeric 0–1–2–3 ───────
+# ─── Migrate old string stages ("INTRO", etc.) to numeric 0–1–2–3 ───────
 _old2num = {"INTRO": 0, "STAGE1": 1, "STAGE2": 2, "THANKS": 3}
 if "stage" in st.session_state and isinstance(st.session_state.stage, str):
     st.session_state.stage = _old2num.get(st.session_state.stage, 0)
@@ -49,15 +49,14 @@ BASE_FEE   = 10    # RMB
 RAND_ORDER = True
 
 # ─────────────────── Google Sheets I/O with gspread ────────────────────
-def _get_gsheet_client() -> gspread.Client:
-    info = st.secrets["connections"]["gsheets"].copy()
-    # extract and remove custom workbook info
+def _get_gsheet_client():
+    cfg = st.secrets["connections"]["gsheets"]
+    info = dict(cfg)  # copy into a normal dict
     ss_id   = info.pop("spreadsheet_id")
     ws_name = info.pop("worksheet")
-    # fix newline escapes in private_key
+    # restore real newlines if secrets used "\n"
     if "private_key" in info:
         info["private_key"] = info["private_key"].replace("\\n", "\n")
-    # create Credentials
     creds = Credentials.from_service_account_info(
         info,
         scopes=[
@@ -69,21 +68,21 @@ def _get_gsheet_client() -> gspread.Client:
     return client, ss_id, ws_name
 
 def _save_responses(data: dict[str, str | int]) -> None:
-    # define column order
-    cols = (["participant_id", "timestamp", "wechat_id"]
-            + [f"q{q}_stage1" for q in QIDS]
-            + [f"q{q}_pred"   for q in QIDS]
-            + [f"q{q}_band"   for q in QIDS]
-            + [f"q{q}_low"    for q in QIDS]
-            + [f"q{q}_high"   for q in QIDS])
+    cols = (
+        ["participant_id", "timestamp", "wechat_id"]
+        + [f"q{q}_stage1" for q in QIDS]
+        + [f"q{q}_pred"   for q in QIDS]
+        + [f"q{q}_band"   for q in QIDS]
+        + [f"q{q}_low"    for q in QIDS]
+        + [f"q{q}_high"   for q in QIDS]
+    )
     row = [data.get(c, "") for c in cols]
-
     client, ss_id, ws_name = _get_gsheet_client()
     sheet = client.open_by_key(ss_id)
     ws    = sheet.worksheet(ws_name)
     ws.append_row(row, value_input_option="USER_ENTERED")
 
-# ─────────────────── Session‐State Initialization ───────────────────────
+# ─────────────────── Session-State Initialization ───────────────────────
 def _init_state() -> None:
     st.session_state.stage = 0
     st.session_state.pid   = str(uuid.uuid4())
@@ -102,7 +101,7 @@ def _init_state() -> None:
 if "stage" not in st.session_state:
     _init_state()
 
-# ─────────────────────── UI Screens ────────────────────────────────────
+# ───────────────────────── UI Screens ───────────────────────────────────
 def run_instructions() -> None:
     st.markdown("""
         ### Welcome to this study in experimental economics  
@@ -144,8 +143,10 @@ def run_stage2() -> None:
         band_key = f"q{qid}_band"
 
         pred = st.slider(
-            "Predict the median (0–100)", 0, 100,
-            value=st.session_state.def2[qid], key=pred_key
+            "Predict the median (0–100)",
+            0, 100,
+            value=st.session_state.def2[qid],
+            key=pred_key
         )
         st.session_state.data[pred_key] = pred
 
@@ -183,7 +184,7 @@ def run_final() -> None:
         f"You will receive {BASE_FEE} RMB + bonus from five random Stage 2 rounds."
     )
 
-# ───────────────────── numeric routing 0-1-2-3 ─────────────────────────
+# ───────────────────── Numeric Routing 0–1–2–3 ─────────────────────────
 if st.session_state.stage == 0:
     run_instructions()
 elif st.session_state.stage == 1:
