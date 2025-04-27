@@ -1,10 +1,10 @@
 """
-Streamlit app · Probability-Word Interpretation + “Wavelength” Game
+Streamlit app · Probability‐Word Interpretation + “Wavelength” Game
 ------------------------------------------------------------------
-• Data are stored in a Google Sheet via gspread (no ephemeral CSV).  
-• Numeric stages 0–1–2–3 routing.  
-• Auto-scroll to top in Stage 2 and disabled-slider preview of chosen interval.  
-• Migrates any old string-based stage cookie to the new numeric scheme.
+• Data are reliably appended to a Google Sheet via gspread.  
+• Numeric routing stages (0–1–2–3).  
+• Auto‐scroll to top in Stage 2 and disabled‐slider preview of chosen interval.  
+• Migrates any old string‐based stage in session_state to numeric.
 """
 
 import streamlit as st
@@ -15,12 +15,12 @@ import uuid
 import gspread
 from google.oauth2.service_account import Credentials
 
-# ─── Migrate old string stages to numeric 0–1–2–3 ─────────────────────────
+# ─── migrate old string stages ("INTRO", etc.) to numeric 0–1–2–3 ───────
 _old2num = {"INTRO": 0, "STAGE1": 1, "STAGE2": 2, "THANKS": 3}
 if "stage" in st.session_state and isinstance(st.session_state.stage, str):
     st.session_state.stage = _old2num.get(st.session_state.stage, 0)
 
-# ───────────────────────── CONFIGURATION ─────────────────────────────────
+# ───────────────────────── CONFIGURATION ────────────────────────────────
 SENTENCES = [
     "If someone tells you that there is an even chance of something, what probability would you interpret that as?",
     "If someone tells you that something is certain, what probability would you interpret that as?",
@@ -38,19 +38,26 @@ SENTENCES = [
     "If someone tells you an event is consistent with expectations, how likely would you think it is to happen?",
     "If someone tells you there is a highly suspicious chance of an event happening, what probability would you interpret that as?",
 ]
-NUM_Q       = len(SENTENCES)
-QIDS        = list(range(1, NUM_Q + 1))
-NARROW_R    = 3
-WIDE_R      = 6
-NARROW_PTS  = 20
-WIDE_PTS    = 10
-PTS2RMB     = 0.7
-BASE_FEE    = 10  # RMB
-RAND_ORDER  = True
+NUM_Q      = len(SENTENCES)
+QIDS       = list(range(1, NUM_Q + 1))
+NARROW_R   = 3
+WIDE_R     = 6
+NARROW_PTS = 20
+WIDE_PTS   = 10
+PTS2RMB    = 0.7
+BASE_FEE   = 10    # RMB
+RAND_ORDER = True
 
-# ────────────────────── Google Sheets Helpers ────────────────────────────
+# ─────────────────── Google Sheets I/O with gspread ────────────────────
 def _get_gsheet_client() -> gspread.Client:
-    info = st.secrets["connections"]["gsheets"]
+    info = st.secrets["connections"]["gsheets"].copy()
+    # extract and remove custom workbook info
+    ss_id   = info.pop("spreadsheet_id")
+    ws_name = info.pop("worksheet")
+    # fix newline escapes in private_key
+    if "private_key" in info:
+        info["private_key"] = info["private_key"].replace("\\n", "\n")
+    # create Credentials
     creds = Credentials.from_service_account_info(
         info,
         scopes=[
@@ -58,28 +65,27 @@ def _get_gsheet_client() -> gspread.Client:
             "https://www.googleapis.com/auth/drive",
         ],
     )
-    return gspread.authorize(creds)
+    client = gspread.authorize(creds)
+    return client, ss_id, ws_name
 
 def _save_responses(data: dict[str, str | int]) -> None:
     # define column order
-    cols = (
-        ["participant_id", "timestamp", "wechat_id"]
-        + [f"q{q}_stage1" for q in QIDS]
-        + [f"q{q}_pred"   for q in QIDS]
-        + [f"q{q}_band"   for q in QIDS]
-        + [f"q{q}_low"    for q in QIDS]
-        + [f"q{q}_high"   for q in QIDS]
-    )
+    cols = (["participant_id", "timestamp", "wechat_id"]
+            + [f"q{q}_stage1" for q in QIDS]
+            + [f"q{q}_pred"   for q in QIDS]
+            + [f"q{q}_band"   for q in QIDS]
+            + [f"q{q}_low"    for q in QIDS]
+            + [f"q{q}_high"   for q in QIDS])
     row = [data.get(c, "") for c in cols]
 
-    client = _get_gsheet_client()
-    sheet = client.open_by_key(st.secrets["connections"]["gsheets"]["spreadsheet_id"])
-    ws    = sheet.worksheet(st.secrets["connections"]["gsheets"]["worksheet"])
+    client, ss_id, ws_name = _get_gsheet_client()
+    sheet = client.open_by_key(ss_id)
+    ws    = sheet.worksheet(ws_name)
     ws.append_row(row, value_input_option="USER_ENTERED")
 
-# ───────────────────── Session-State Initialization ─────────────────────
+# ─────────────────── Session‐State Initialization ───────────────────────
 def _init_state() -> None:
-    st.session_state.stage = 0  # 0=intro,1=stage1,2=stage2,3=thanks
+    st.session_state.stage = 0
     st.session_state.pid   = str(uuid.uuid4())
     st.session_state.data  = {
         "participant_id": st.session_state.pid,
@@ -96,14 +102,14 @@ def _init_state() -> None:
 if "stage" not in st.session_state:
     _init_state()
 
-# ───────────────────────── UI Screens ────────────────────────────────────
+# ─────────────────────── UI Screens ────────────────────────────────────
 def run_instructions() -> None:
     st.markdown("""
         ### Welcome to this study in experimental economics  
         **NYU Shanghai · Behavioral & Experimental Economics Lab**
 
         Duration: 20–30 min  
-        Payment: 10 RMB show-up fee + bonus from Stage 2  
+        Payment: 10 RMB show-up fee + bonus from Stage 2.
 
         Enter your WeChat ID (leave blank for cash) and click **Begin Stage 1 →**.
     """)
@@ -138,10 +144,8 @@ def run_stage2() -> None:
         band_key = f"q{qid}_band"
 
         pred = st.slider(
-            "Predict the median (0–100)",
-            0, 100,
-            value=st.session_state.def2[qid],
-            key=pred_key
+            "Predict the median (0–100)", 0, 100,
+            value=st.session_state.def2[qid], key=pred_key
         )
         st.session_state.data[pred_key] = pred
 
@@ -162,8 +166,7 @@ def run_stage2() -> None:
         st.session_state.data[f"q{qid}_high"] = high
 
         st.slider(
-            "Selected interval",
-            0, 100,
+            "Selected interval", 0, 100,
             value=(low, high),
             disabled=True,
             key=f"view_{qid}"
@@ -180,7 +183,7 @@ def run_final() -> None:
         f"You will receive {BASE_FEE} RMB + bonus from five random Stage 2 rounds."
     )
 
-# ───────────────────────── Numeric Routing ───────────────────────────────
+# ───────────────────── numeric routing 0-1-2-3 ─────────────────────────
 if st.session_state.stage == 0:
     run_instructions()
 elif st.session_state.stage == 1:
