@@ -15,7 +15,10 @@ import random
 import uuid
 
 import pandas as pd
-import streamlit as st
+import streamlit as st, sys
+if not hasattr(st, "experimental_connection") and sys.version_info >= (3, 8):
+    st.error("⚠️ Streamlit ≥ 1.30 required.  Re-deploy with streamlit>=1.30 in requirements.txt."); st.stop()
+
 from streamlit.runtime.connections import connect as _connect   # ← stable alias
 
 # ─────────────────────────── MIGRATE OLD COOKIE ──────────────────────────
