@@ -1,3 +1,4 @@
 streamlit>=1.30          
-gspread                 
+gspread
+google-auth
 pandas                  
