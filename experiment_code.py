@@ -1,10 +1,10 @@
 """
 Streamlit app · Probability-Word Interpretation + “Wavelength” Game
 ------------------------------------------------------------------
-• Data appended to a local CSV (“data/responses.csv”) with a guaranteed header.
-• Four numeric stages: 0=intro, 1=stage1, 2=stage2, 3=thanks.
-• Stage-2 auto-scrolls to top exactly once.
-• Buttons respond on first click via on_click callbacks.
+• Data are appended to a local CSV (data/responses.csv) with a guaranteed header.
+• Four numeric stages: 0 = intro, 1 = stage1, 2 = stage2, 3 = thanks.
+• Stage 2 auto-scrolls to top exactly once.
+• Buttons react on first click via on_click callbacks.
 • Question numbers hidden from participants.
 """
 
@@ -15,7 +15,7 @@ import random
 import uuid
 import os
 
-# ───────────────────────────── CONFIG ────────────────────────────────────
+# ─────────────────── CONFIG ────────────────────────────────────────────────
 SENTENCES = [
     "If someone tells you that there is an even chance of something, what probability would you interpret that as?",
     "If someone tells you that something is certain, what probability would you interpret that as?",
@@ -43,21 +43,23 @@ PTS2RMB      = 0.7
 BASE_FEE_RMB = 10
 RAND_ORDER   = True
 
-DATA_DIR     = "data"
-CSV_NAME     = "responses.csv"
+# ────────────────── LOCAL CSV PATH ─────────────────────────────────────────
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = os.path.join(BASE_DIR, "data")
+CSV_PATH = os.path.join(DATA_DIR, "responses.csv")
 
-# ─────────────────── LOCAL CSV HELPERS ──────────────────────────────────
-def _ensure_header(cols: list[str]):
+# ──────────────── CSV HELPER FUNCTIONS ────────────────────────────────────
+def _ensure_csv_header(cols: list[str]):
+    """Create CSV with header if it doesn’t exist."""
     os.makedirs(DATA_DIR, exist_ok=True)
-    path = os.path.join(DATA_DIR, CSV_NAME)
-    if not os.path.exists(path):
-        pd.DataFrame(columns=cols).to_csv(path, index=False)
+    if not os.path.exists(CSV_PATH):
+        pd.DataFrame(columns=cols).to_csv(CSV_PATH, index=False)
 
-def _append_to_csv(data: dict[str, str|int], cols: list[str]):
-    path = os.path.join(DATA_DIR, CSV_NAME)
-    _ensure_header(cols)
+def _append_to_csv(data: dict[str, str | int], cols: list[str]):
+    """Append one row to CSV under the given columns."""
+    _ensure_csv_header(cols)
     row = {c: data.get(c, "") for c in cols}
-    pd.DataFrame([row]).to_csv(path, mode="a", header=False, index=False)
+    pd.DataFrame([row]).to_csv(CSV_PATH, mode="a", header=False, index=False)
 
 # ───────────────── SESSION-STATE INITIALIZATION ─────────────────────────
 if "initialized" not in st.session_state:
@@ -69,20 +71,18 @@ if "initialized" not in st.session_state:
         "timestamp": datetime.datetime.now(datetime.timezone.utc)
                              .isoformat(timespec="seconds"),
     }
-    # build & shuffle question list
+    # build and optionally shuffle the questions
     qlist = list(zip(QIDS, SENTENCES))
     if RAND_ORDER:
         random.shuffle(qlist)
     st.session_state.qlist = qlist
-
-    # random defaults for sliders
+    # random defaults
     st.session_state.def1 = {q: random.randint(0, 100) for q in QIDS}
     st.session_state.def2 = {q: random.randint(0, 100) for q in QIDS}
-
-    # flag for auto-scroll in Stage 2
+    # for auto-scroll
     st.session_state.first_scroll = True
 
-# ───────────────── BUTTON CALLBACKS ─────────────────────────────────────
+# ─────────────────── BUTTON CALLBACKS ─────────────────────────────────────
 def go_to_stage1():
     st.session_state.stage = 1
 
@@ -93,7 +93,7 @@ def go_to_stage2():
 def submit_all():
     # record WeChat ID
     st.session_state.data["wechat_id"] = st.session_state.get("wechat_id", "")
-    # define columns
+    # define column order
     cols = (
         ["participant_id", "timestamp", "wechat_id"]
         + [f"q{q}_stage1" for q in QIDS]
@@ -102,18 +102,22 @@ def submit_all():
         + [f"q{q}_low"    for q in QIDS]
         + [f"q{q}_high"   for q in QIDS]
     )
+    # append locally
     _append_to_csv(st.session_state.data, cols)
+    # show user the last few entries for confirmation
+    df = pd.read_csv(CSV_PATH)
+    st.write("## Recent submissions", df.tail(5))
+    # move to thank-you
     st.session_state.stage = 3
 
-# ───────────────────────── UI SCREENS ───────────────────────────────────
+# ───────────────────────── UI SCREENS ────────────────────────────────────
 def screen_intro():
     st.markdown("""
     ### Probability-Word Interpretation Study  
     **NYU Shanghai · Behavioral & Experimental Economics Lab**
 
-    Duration ≈ 20–30 min | Payment = 10 RMB + bonus from Stage 2
-
-    Enter your WeChat ID (leave blank for cash) then click **Begin**.
+    Duration ≈ 20–30 min | Payment = 10 RMB + bonus from Stage 2  
+    Enter your WeChat ID (leave blank for cash), then click **Begin**.
     """)
     st.text_input("WeChat ID", key="wechat_id")
     st.button("Begin Stage 1 →", key="btn_intro", on_click=go_to_stage1)
@@ -123,12 +127,14 @@ def screen_stage1():
     for qid, sentence in st.session_state.qlist:
         key = f"q{qid}_stage1"
         st.session_state.data[key] = st.slider(
-            sentence, 0, 100, value=st.session_state.def1[qid], key=key
+            sentence, 0, 100,
+            value=st.session_state.def1[qid],
+            key=key
         )
     st.button("Continue to Stage 2 →", key="btn_s1", on_click=go_to_stage2)
 
 def screen_stage2():
-    # auto-scroll once
+    # auto-scroll to top exactly once
     if st.session_state.first_scroll:
         st.components.v1.html("<script>window.scrollTo(0,0);</script>", height=0)
         st.session_state.first_scroll = False
@@ -140,16 +146,17 @@ def screen_stage2():
     )
 
     for qid, sentence in st.session_state.qlist:
-        st.subheader(sentence)  # no "Qn."
+        st.subheader(sentence)  # no "Qn." prefix
         pred_key = f"q{qid}_pred"
         band_key = f"q{qid}_band"
 
-        st.session_state.data[pred_key] = st.slider(
+        pred = st.slider(
             "Predict the median (0–100)",
             0, 100,
             value=st.session_state.def2[qid],
             key=pred_key
         )
+        st.session_state.data[pred_key] = pred
 
         choice = st.radio(
             "Choose band width",
@@ -163,7 +170,7 @@ def screen_stage2():
         st.session_state.data[band_key] = band
 
         half = NARROW_R if band == "narrow" else WIDE_R
-        low, high = max(0, st.session_state.data[pred_key] - half), min(100, st.session_state.data[pred_key] + half)
+        low, high = max(0, pred-half), min(100, pred+half)
         st.session_state.data[f"q{qid}_low"]  = low
         st.session_state.data[f"q{qid}_high"] = high
 
@@ -183,7 +190,7 @@ def screen_thanks():
         f"You will receive **{BASE_FEE_RMB} RMB** + bonus from five random Stage 2 rounds."
     )
 
-# ─────────────────────────── ROUTER ─────────────────────────────────────
+# ───────────────────────────── ROUTER ────────────────────────────────────
 {
     0: screen_intro,
     1: screen_stage1,
