@@ -1,4 +1,4 @@
-# experiment_code.py  – full consent text + WeChat-ID check
+# experiment_code.py  – full consent text + WeChat-ID check + mandatory comprehension check
 import streamlit as st, streamlit.components.v1 as components
 import datetime, random, uuid, textwrap, gspread
 from google.oauth2.service_account import Credentials
@@ -39,7 +39,8 @@ RAND_ORDER = True
 # ── Sheets helpers ───────────────────────────────────────────────
 HEADER = (
     ["participant_id", "timestamp", "wechat_id",
-     "consent_confidentiality", "consent_future_use"]
+     "consent_confidentiality", "consent_future_use",
+     "comp_q1", "comp_q2"]                     # comprehension answers
     + [f"q{q}_stage1" for q in QIDS]
     + [f"q{q}_pred"   for q in QIDS]
     + [f"q{q}_band"   for q in QIDS]
@@ -71,7 +72,7 @@ def _save(data: dict):
 
 # ── State initialisation ─────────────────────────────────────────
 def _init():
-    st.session_state.stage = -1            # -1 consent, 0 instructions, then 1…
+    st.session_state.stage = -1            # -1 consent, 0 instructions+check, 1…
     st.session_state.pid   = str(uuid.uuid4())
     st.session_state.data  = {"participant_id": st.session_state.pid,
                               "timestamp": datetime.datetime.utcnow()
@@ -87,6 +88,8 @@ if "stage" not in st.session_state:
 
 # ── Text blocks (verbatim) ───────────────────────────────────────
 CONSENT_MD = textwrap.dedent("""\
+# Research Informed Consent Form
+
 **Study Title:** Probability Interpretation Study  
 **Investigators:** Maya Wong, Mona Hong, Eli Khaytser and Jiayu Xu
 
@@ -180,11 +183,117 @@ If you have questions about your rights as a research participant or believe you
 """)
 
 INSTR_MD = textwrap.dedent("""\
-### Instructions for Participants
+# Instructions for Participants
 
-Welcome to this study in experimental economics, conducted by the **Shanghai Behavioral and Experimental Economics Lab** at **NYU Shanghai** …
+Welcome to this study in experimental economics, conducted by the **Shanghai Behavioral and Experimental Economics Lab**. This investigation examines how people interpret probabilistic information in decision-making contexts. The study is funded by **NYU Shanghai** through resources dedicated to research. The session will take approximately **20–30 minutes**. Please read these instructions carefully, as your payment depends on your decisions during the experiment.
 
-*(entire instruction text you supplied, converted to Markdown – no content removed)*
+Please read these instructions quietly to yourself. Refrain from talking or communicating with other participants during the session. Electronic devices must be turned off and stored away. If you have questions, raise your hand and wait for an experimenter to approach you—do not speak aloud.
+
+---
+
+## Payment
+
+You will receive a **10 RMB completion fee** for participating. Through careful decision-making, you can earn additional rewards based on your performance. All payments require a signed receipt and will be processed within 14 days after the conclusion of the study. Details on payment are below.
+
+---
+
+## Session Structure
+
+The experiment consists of a series of individual decisions presented in two stages. These stages and their relation to your total payment are detailed below.
+
+### Stage 1: Interpreting Probability Words
+
+You will see a series of sentences, each containing a single qualitative probability term (for example, “likely,” “unlikely,” or “very few people”). For each sentence:
+
+- A slider labeled **0–100** will appear below the sentence.  
+- Move the slider to indicate the numerical probability (in percent) that you associate with that sentence.  
+- Once you are happy with your answer, click **Next** to submit and proceed.
+
+You will answer 15 such questions.
+
+### Stage 2: The Wavelength Game
+
+In this stage, you will guess how others in Stage 1 interpreted each term and choose one of two interval widths (“bands”):
+
+1. We display the same sentence again.  
+2. Use the slider to indicate your **best guess** of the median answer given by all participants in Stage 1.  
+3. Choose one of two interval widths:  
+   - **Narrow band** (±3 points):  
+     - If the true median lies inside your interval, you earn **14 RMB**.  
+     - If it lies outside, you earn **0 RMB**.  
+   - **Wide band** (±6 points):  
+     - If the true median lies inside your interval, you earn **7 RMB**.  
+     - If it lies outside, you earn **0 RMB**.  
+4. Click **Next** to proceed.
+
+You will play the Wavelength Game on the same 15 sentences from Stage 1.
+
+---
+
+## Earnings and Payment
+
+- **Completion Fee:** 10 RMB  
+- **Stage 2 Payoff:**  
+  - **5 rounds** will be randomly selected for payment.  
+  - For each selected round:  
+    - If your chosen interval contains the true median of at least 11 other participants, you earn points (see below).  
+- **Point Rewards:**  
+  - Narrow band: 20 points per correct response  
+  - Wide band:   10 points per correct response  
+- **Exchange Rate:** 1 point = 0.7 RMB  
+- **Total Payment:** Base fee + (Total points from selected rounds × 0.7 RMB)
+
+### Example Calculation
+
+- Suppose you succeed in 3 rounds with narrow bands and 2 with wide bands:  
+  - Points earned: (3 × 20) + (2 × 10) = 80 points  
+  - Converted to RMB: 80 × 0.7 = 56 RMB  
+  - Base fee: 10 RMB  
+  - **Total:** 66 RMB  
+
+---
+
+## Payment Procedure
+
+- **Receipt Requirement:** All payments require signing a receipt.  
+- **Payment Methods:**  
+  - **WeChat Transfer** (preferred): Provide your WeChat ID for remote payment.  
+  - **In-Person Collection:** If no WeChat ID is provided, you must return to the lab to receive payment and sign the receipt.  
+- **Payment Timeline:** All payments will be processed within **[X] days** after the experiment concludes.
+
+---
+
+## Important Reminders
+
+- Aim for accuracy in both stages—precision and calibration matter!  
+- There are no “right” or “wrong” answers in Stage 1; we want your personal interpretations.  
+- In Stage 2, a wider band lowers your reward but increases your chance of earning it.  
+- If you have any questions, raise your hand at any time.
+
+Once everyone is ready, we will begin **Stage 1**.
+
+---
+
+## Comprehension Check
+
+Please answer the following before we begin. Raise your hand if you need clarification.
+
+1. **Stage 2 Success**  
+   To earn points for an item in Stage 2, your chosen interval must contain:  
+   - [ ] Your personal answer from Stage 1  
+   - [ ] The **median** of other participants’ answers   
+   - [ ] The experimenter’s suggested answer  
+
+2. **Payment Calculation**  
+   Your total payment equals:  
+   - [ ] 10 RMB + (Total Points × 0.7 RMB) from all rounds  
+   - [ ] 10 RMB + (Total Points × 0.7 RMB) from **5 randomly selected** rounds 
+   - [ ] 20 points per correct narrow band answer  
+
+### Correct Answers
+
+1. The **median** of other participants’ answers  
+2. 10 RMB + (Total Points × 0.7 RMB) from **5 randomly selected** rounds  
 """)
 
 # ── Callbacks ────────────────────────────────────────────────────
@@ -198,10 +307,16 @@ def consent_next():
         return
     st.session_state.data["consent_confidentiality"] = True
     st.session_state.data["consent_future_use"] = fut
-    st.session_state.stage = 0                   # show instructions
+    st.session_state.stage = 0                   # show instructions + comprehension
 
 def begin_stage1():
+    # require comprehension answers
+    if st.session_state.get("comp_q1") == "" or st.session_state.get("comp_q2") == "":
+        st.warning("Please answer both comprehension questions to continue.")
+        return
     st.session_state.data["wechat_id"] = st.session_state["wechat_id"]
+    st.session_state.data["comp_q1"] = st.session_state["comp_q1"]
+    st.session_state.data["comp_q2"] = st.session_state["comp_q2"]
     st.session_state.stage = 1
 
 def next_to_stage2():
@@ -218,19 +333,34 @@ if st.session_state.stage == -1:
     st.markdown(CONSENT_MD)
     st.checkbox("I understand that my participation in this study will remain confidential but my information is going to be kept in the study", key="conf_agree")
 
-    fut = st.radio("We may wish to use information about you collected for this study for future research, share it with other researchers, or place it in a data repository. These studies may be similar to this study or completely different. We will not ask for your additional permission before sharing this information. Please indicate below your permissions regarding this use of your information:",
-                   ["no_share", "deidentified", "identifiable"],
-                   format_func=lambda x: {
-                       "no_share": "I do not give permission to use my data for future research or to share it with other researchers. Use it only for this research study.",
-                       "deidentified": "I give permission to use my de-identified data for future research, share it with other researchers, or place it in a data repository. Remove all information that could identify me before sharing or using the data.",
-                       "identifiable": "I give permission to use my identifiable data for future research, share it with other researchers, or place it in a data repository. I understand that this information may be used to identify me personally."
-                   }[x], key="fut_choice")
+    fut = st.radio(
+        "We may wish to use information about you collected for this study for future research, share it with other researchers, or place it in a data repository. These studies may be similar to this study or completely different. We will not ask for your additional permission before sharing this information. Please indicate below your permissions regarding this use of your information:",
+        ["no_share", "deidentified", "identifiable"],
+        format_func=lambda x: {
+            "no_share": "I do not give permission to use my data for future research or to share it with other researchers. Use it only for this research study.",
+            "deidentified": "I give permission to use my de-identified data for future research, share it with other researchers, or place it in a data repository. Remove all information that could identify me before sharing or using the data.",
+            "identifiable": "I give permission to use my identifiable data for future research, share it with other researchers, or place it in a data repository. I understand that this information may be used to identify me personally."
+        }[x],
+        key="fut_choice")
     st.button("Continue →", on_click=consent_next)
 
 elif st.session_state.stage == 0:
     st.markdown(INSTR_MD)
     st.text_input("WeChat ID (required for payment via WeChat transfer):",
                   key="wechat_id")
+
+    st.markdown("### Comprehension Check")
+    st.radio(
+        "1 · To earn points for an item in Stage 2, your chosen interval must contain…",
+        ["", "your Stage 1 answer", "the **median** of other participants’ answers", "the experimenter’s suggested answer"],
+        key="comp_q1")
+    st.radio(
+        "2 · Your total payment equals…",
+        ["", "10 RMB + (Total Points × 0.7 RMB) from all rounds",
+         "10 RMB + (Total Points × 0.7 RMB) from **5 randomly selected** rounds",
+         "20 points per correct narrow band answer"],
+        key="comp_q2")
+
     st.button("Begin Stage 1 →", on_click=begin_stage1,
               disabled=st.session_state.get("wechat_id", "") == "")
 
