@@ -272,28 +272,7 @@ You will play the Wavelength Game on the same 15 sentences from Stage 1.
 
 Once everyone is ready, we will begin **Stage 1**.
 
----
-
-## Comprehension Check
-
-Please answer the following before we begin. Raise your hand if you need clarification.
-
-1. **Stage 2 Success**  
-   To earn points for an item in Stage 2, your chosen interval must contain:  
-   - [ ] Your personal answer from Stage 1  
-   - [ ] The **median** of other participants’ answers   
-   - [ ] The experimenter’s suggested answer  
-
-2. **Payment Calculation**  
-   Your total payment equals:  
-   - [ ] 10 RMB + (Total Points × 0.7 RMB) from all rounds  
-   - [ ] 10 RMB + (Total Points × 0.7 RMB) from **5 randomly selected** rounds 
-   - [ ] 20 points per correct narrow band answer  
-
-### Correct Answers
-
-1. The **median** of other participants’ answers  
-2. 10 RMB + (Total Points × 0.7 RMB) from **5 randomly selected** rounds  
+---  
 """)
 
 # ── Callbacks ────────────────────────────────────────────────────
@@ -307,6 +286,7 @@ def consent_next():
         return
     st.session_state.data["consent_confidentiality"] = True
     st.session_state.data["consent_future_use"] = fut
+    st.session_state.data["wechat_id"] = st.session_state["wechat_id"]
     st.session_state.stage = 0                   # show instructions + comprehension
 
 def begin_stage1():
@@ -314,7 +294,6 @@ def begin_stage1():
     if st.session_state.get("comp_q1") == "" or st.session_state.get("comp_q2") == "":
         st.warning("Please answer both comprehension questions to continue.")
         return
-    st.session_state.data["wechat_id"] = st.session_state["wechat_id"]
     st.session_state.data["comp_q1"] = st.session_state["comp_q1"]
     st.session_state.data["comp_q2"] = st.session_state["comp_q2"]
     st.session_state.stage = 1
@@ -352,11 +331,11 @@ elif st.session_state.stage == 0:
     st.markdown("### Comprehension Check")
     st.radio(
         "1 · To earn points for an item in Stage 2, your chosen interval must contain…",
-        ["", "your Stage 1 answer", "the **median** of other participants’ answers", "the experimenter’s suggested answer"],
+        ["your Stage 1 answer", "the **median** of other participants’ answers", "the experimenter’s suggested answer"],
         key="comp_q1")
     st.radio(
         "2 · Your total payment equals…",
-        ["", "10 RMB + (Total Points × 0.7 RMB) from all rounds",
+        ["10 RMB + (Total Points × 0.7 RMB) from all rounds",
          "10 RMB + (Total Points × 0.7 RMB) from **5 randomly selected** rounds",
          "20 points per correct narrow band answer"],
         key="comp_q2")
