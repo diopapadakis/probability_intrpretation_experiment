@@ -65,9 +65,6 @@ def _ensure_header(ws, cols):
         ws.insert_row(cols, index=1)
 
 def _save_row(row, cols):
-    if not _gsheets_ready():
-        st.warning("⚠️ Google-Sheets secrets not set; data not saved.")
-        return
     ws = _get_ws()
     _ensure_header(ws, cols)
     ws.append_row(row, value_input_option="USER_ENTERED")
