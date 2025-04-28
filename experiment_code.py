@@ -1,20 +1,23 @@
 """
 Streamlit app · Probability-Word Interpretation + “Wavelength” Game
 ------------------------------------------------------------------
-• Appends every submission to a Google Sheet via gspread (with header).  
-• Four numeric stages: 0-intro, 1-stage1, 2-stage2, 3-thanks.  
-• Stage-2 page auto-scrolls to top exactly once.  
-• Buttons react on first click (unique keys + on_click).  
-• Question numbers are hidden from participants.  
-• Runs even without Google-Sheets secrets (useful for local dev).
+• Data are appended to:
+    1) A local CSV (“data/responses.csv”) with a guaranteed header.
+    2) (Optionally) A Google Sheet via gspread if secrets are provided.
+• Four numeric stages: 0–intro, 1–stage1, 2–stage2, 3–thanks.
+• Stage-2 auto-scrolls to top exactly once.
+• Buttons respond on first click via on_click callbacks.
+• Question numbers are hidden from participants.
 """
 
 import streamlit as st
-import datetime, random, uuid
-import gspread
-from google.oauth2.service_account import Credentials
+import pandas as pd
+import datetime
+import random
+import uuid
+import os
 
-# ──────────────────────────── CONFIG ────────────────────────────────────
+# ───────────────────────── CONFIG ─────────────────────────────────────────
 SENTENCES = [
     "If someone tells you that there is an even chance of something, what probability would you interpret that as?",
     "If someone tells you that something is certain, what probability would you interpret that as?",
@@ -42,77 +45,86 @@ PTS2RMB      = 0.7
 BASE_FEE_RMB = 10
 RAND_ORDER   = True
 
-# ─────────────────── Google-Sheets helpers (optional) ───────────────────
-def _gsheets_ready() -> bool:
-    return "connections" in st.secrets and "gsheets" in st.secrets["connections"]
+# ────────────────── LOCAL CSV HELPER ─────────────────────────────────────
+CSV_PATH = "data/responses.csv"
 
-def _get_ws():
-    cfg = st.secrets["connections"]["gsheets"]
-    info = {k: v.replace("\\n", "\n") if k == "private_key" else v for k, v in cfg.items()}
-    ss_id   = info.pop("spreadsheet_id")
-    ws_name = info.pop("worksheet")
-    creds = Credentials.from_service_account_info(info, scopes=[
-        "https://www.googleapis.com/auth/spreadsheets",
-        "https://www.googleapis.com/auth/drive",
-    ])
-    client = gspread.authorize(creds)
-    return client.open_by_key(ss_id).worksheet(ws_name)
+def _ensure_local_csv_header(cols):
+    os.makedirs(os.path.dirname(CSV_PATH), exist_ok=True)
+    if not os.path.exists(CSV_PATH):
+        pd.DataFrame(columns=cols).to_csv(CSV_PATH, index=False)
 
-def _ensure_header(ws, cols):
-    if ws.row_count == 0 or ws.row_values(1) != cols:
-        if ws.row_count:                       # remove wrong header
-            ws.delete_rows(1)
-        ws.insert_row(cols, index=1)
+def _append_to_local_csv(data, cols):
+    _ensure_local_csv_header(cols)
+    row = {c: data.get(c, "") for c in cols}
+    pd.DataFrame([row]).to_csv(CSV_PATH, mode="a", header=False, index=False)
 
-def _save_row(row, cols):
-    ws = _get_ws()
-    _ensure_header(ws, cols)
-    ws.append_row(row, value_input_option="USER_ENTERED")
+# ──────────────────── OPTIONAL G-SHEETS HELPER ───────────────────────────
+# Requires `gspread` and `google-auth` in requirements and `[connections.gsheets]` in secrets.toml
+def _append_to_gsheet(data, cols):
+    try:
+        import gspread
+        from google.oauth2.service_account import Credentials
+        cfg = st.secrets["connections"]["gsheets"]
+        info = {k: v.replace("\\n","\n") if k=="private_key" else v for k,v in cfg.items()}
+        ss_id = info.pop("spreadsheet_id"); ws_name = info.pop("worksheet")
+        creds = Credentials.from_service_account_info(info, scopes=[
+            "https://www.googleapis.com/auth/spreadsheets",
+            "https://www.googleapis.com/auth/drive",
+        ])
+        client = gspread.authorize(creds)
+        ws = client.open_by_key(ss_id).worksheet(ws_name)
+        # ensure header row correct
+        if ws.row_count==0 or ws.row_values(1)!=cols:
+            if ws.row_count: ws.delete_rows(1)
+            ws.insert_row(cols, index=1)
+        # append
+        row = [data.get(c,"") for c in cols]
+        ws.append_row(row, value_input_option="USER_ENTERED")
+    except Exception as e:
+        st.warning(f"⚠️ Could not write to Google Sheet: {e}")
 
-# ─────────────────── Session-state init ─────────────────────────────────
+# ─────────────────── SESSION-STATE INIT ─────────────────────────────────
 if "stage" not in st.session_state:
-    st.session_state.stage = 0                       # 0=intro
+    st.session_state.stage = 0
     st.session_state.pid   = str(uuid.uuid4())
     st.session_state.data  = {
         "participant_id": st.session_state.pid,
         "timestamp": datetime.datetime.now(datetime.timezone.utc)
-                                 .isoformat(timespec="seconds"),
+                                 .isoformat(timespec="seconds")
     }
-    question_list = list(zip(QIDS, SENTENCES))
-    if RAND_ORDER:
-        random.shuffle(question_list)
-    st.session_state.qlist         = question_list
-    st.session_state.stage1_defaults = {q: random.randint(0, 100) for q in QIDS}
-    st.session_state.stage2_defaults = {q: random.randint(0, 100) for q in QIDS}
+    qlist = list(zip(QIDS, SENTENCES))
+    if RAND_ORDER: random.shuffle(qlist)
+    st.session_state.qlist = qlist
+    st.session_state.def1  = {q: random.randint(0,100) for q in QIDS}
+    st.session_state.def2  = {q: random.randint(0,100) for q in QIDS}
 
-# ─────────────────── Button helper (single click) ───────────────────────
-def _set_stage(new_stage: int):
-    st.session_state.stage = new_stage
+# ─────────────────── BUTTON HELPER ────────────────────────────────────────
+def _set_stage(s: int):
+    st.session_state.stage = s
 
-# ─────────────────── UI screens ─────────────────────────────────────────
+# ─────────────────── UI SCREENS ─────────────────────────────────────────
 def screen_intro():
     st.markdown("""
-    ### Probability-Word Interpretation Study  
-    **NYU Shanghai · Behavioral & Experimental Economics Lab**
+        ### Probability-Word Interpretation Study  
+        **NYU Shanghai · Behavioral & Experimental Economics Lab**
 
-    Duration ~20-30 min | Payment 10 RMB show-up + bonus from Stage 2.
-
-    Enter your WeChat ID (leave blank for cash) then click **Begin**.
+        Duration ≈ 20–30 min | Payment = 10 RMB + bonus from Stage 2  
+        Enter your WeChat ID (blank for cash) then click **Begin**.
     """)
     st.text_input("WeChat ID", key="wechat_id")
     st.button("Begin Stage 1 →", key="btn_intro", on_click=_set_stage, args=(1,))
 
 def screen_stage1():
-    st.header("Stage 1 – Your own interpretation (0-100)")
+    st.header("Stage 1 – Your own interpretation (0–100)")
     for qid, sentence in st.session_state.qlist:
         key = f"q{qid}_stage1"
         st.session_state.data[key] = st.slider(
-            sentence, 0, 100, value=st.session_state.stage1_defaults[qid], key=key
+            sentence, 0, 100, value=st.session_state.def1[qid], key=key
         )
     st.button("Continue to Stage 2 →", key="btn_s1", on_click=_set_stage, args=(2,))
 
 def screen_stage2():
-    # auto-scroll to top once
+    # auto-scroll once
     if st.session_state.pop("_first_scroll", True):
         st.components.v1.html("<script>window.scrollTo(0,0);</script>", height=0)
 
@@ -123,11 +135,12 @@ def screen_stage2():
     )
 
     for qid, sentence in st.session_state.qlist:
-        st.subheader(sentence)                    # no “Qn.” prefix
-        pred_key, band_key = f"q{qid}_pred", f"q{qid}_band"
+        st.subheader(sentence)  # no Qn.
+        pred_key = f"q{qid}_pred"
+        band_key = f"q{qid}_band"
 
-        pred = st.slider("Predict the median (0-100)", 0, 100,
-                         value=st.session_state.stage2_defaults[qid], key=pred_key)
+        pred = st.slider("Predict the median (0–100)",
+                         0, 100, value=st.session_state.def2[qid], key=pred_key)
         st.session_state.data[pred_key] = pred
 
         choice = st.radio(
@@ -139,8 +152,8 @@ def screen_stage2():
         band = "narrow" if choice.startswith("Narrow") else "wide"
         st.session_state.data[band_key] = band
 
-        half = NARROW_R if band == "narrow" else WIDE_R
-        low, high = max(0, pred - half), min(100, pred + half)
+        half = NARROW_R if band=="narrow" else WIDE_R
+        low, high = max(0, pred-half), min(100, pred+half)
         st.session_state.data[f"q{qid}_low"]  = low
         st.session_state.data[f"q{qid}_high"] = high
 
@@ -148,23 +161,30 @@ def screen_stage2():
                   disabled=True, key=f"view_{qid}")
 
     if st.button("Submit all responses", key="btn_submit"):
-        st.session_state.data["wechat_id"] = st.session_state.get("wechat_id", "")
-        columns = (
-            ["participant_id", "timestamp", "wechat_id"]
-            + [f"q{q}_stage1" for q in QIDS]
-            + [f"q{q}_pred"   for q in QIDS]
-            + [f"q{q}_band"   for q in QIDS]
-            + [f"q{q}_low"    for q in QIDS]
-            + [f"q{q}_high"   for q in QIDS]
+        st.session_state.data["wechat_id"] = st.session_state.get("wechat_id","")
+        cols = (
+            ["participant_id","timestamp","wechat_id"] +
+            [f"q{q}_stage1" for q in QIDS] +
+            [f"q{q}_pred"   for q in QIDS] +
+            [f"q{q}_band"   for q in QIDS] +
+            [f"q{q}_low"    for q in QIDS] +
+            [f"q{q}_high"   for q in QIDS]
         )
-        _save_row([st.session_state.data.get(c, "") for c in columns], columns)
+        # append locally
+        _append_to_local_csv(st.session_state.data, cols)
+        # append to sheet if configured
+        _append_to_gsheet(st.session_state.data, cols)
         _set_stage(3)
 
 def screen_thanks():
     st.success(
         f"Thank you for participating!\n\n"
-        f"You will receive **{BASE_FEE_RMB} RMB** plus bonus from five random Stage-2 rounds."
+        f"You will receive **{BASE_FEE_RMB} RMB** + bonus from five random Stage 2 rounds."
     )
 
 # ─────────────────── Router ─────────────────────────────────────────────
-{0: screen_intro, 1: screen_stage1, 2: screen_stage2}.get(st.session_state.stage, screen_thanks)()
+{
+    0: screen_intro,
+    1: screen_stage1,
+    2: screen_stage2
+}.get(st.session_state.stage, screen_thanks)()
