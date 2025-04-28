@@ -287,7 +287,7 @@ def consent_next():
         return
     st.session_state.data["consent_confidentiality"] = True
     st.session_state.data["consent_future_use"] = fut
-    st.session_state.data["wechat_id"] = st.session_state["wechat_id"]
+    st.session_state.data["wechat_id"] = st.session_state.get("wechat_id", "")
     st.session_state.stage = 0                   # show instructions + comprehension
     st.session_state._scrolled_instr = False
 
@@ -305,7 +305,7 @@ def next_to_stage2():
     st.session_state._scroll_to_top = False
 
 def submit_all():
-    st.session_state.data["wechat_id"] = st.session_state["wechat_id"]
+    st.session_state.data["wechat_id"] = st.session_state.get("wechat_id", "")
     _save(st.session_state.data)
     st.session_state.stage = 3
 
@@ -330,9 +330,12 @@ if st.session_state.stage == -1:
     st.button("Continue →", on_click=consent_next)
 
 elif st.session_state.stage == 0:
-    if not st.session_state._scrolled_instr:
-        components.html("<script>window.scrollTo(0,0);</script>", height=0)
-        st.session_state._scrolled_instr = True
+    st.markdown(
+        "<script>"
+        "window.onload = function() { window.scrollTo(0,0); };"
+        "</script>",
+        unsafe_allow_html=True
+    )
     st.markdown(INSTR_MD)
     st.markdown("### Comprehension Check")
     st.radio(
@@ -358,9 +361,12 @@ elif st.session_state.stage == 1:
     st.button("Continue to Stage 2 →", on_click=next_to_stage2)
 
 elif st.session_state.stage == 2:
-    if not st.session_state.get("_scroll_to_top", False):
-        components.html("<script>window.scrollTo(0,0);</script>", height=0)
-        st.session_state._scroll_to_top = True
+    st.markdown(
+        "<script>"
+        "window.onload = function() { window.scrollTo(0,0); };"
+        "</script>",
+        unsafe_allow_html=True
+    )
 
     st.header("Stage 2 – Predict the Group Median")
     st.write(f"**Narrow** ±{NARROW_R} → {NARROW_PTS*PTS2RMB:.0f} RMB   |   "
