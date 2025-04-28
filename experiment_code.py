@@ -83,6 +83,7 @@ def _init():
     st.session_state.qlist       = qlist
     st.session_state.stage1_def  = {q: random.randint(0,100) for q in QIDS}
     st.session_state.stage2_def  = {q: random.randint(0,100) for q in QIDS}
+    st.session_state["wechat_id"] = ""
 if "stage" not in st.session_state:
     _init()
 
@@ -321,13 +322,14 @@ if st.session_state.stage == -1:
             "identifiable": "I give permission to use my identifiable data for future research, share it with other researchers, or place it in a data repository. I understand that this information may be used to identify me personally."
         }[x],
         key="fut_choice")
+
+    st.text_input(
+        "WeChat ID (required for payment via WeChat transfer):",
+        key="wechat_id")
     st.button("Continue →", on_click=consent_next)
 
 elif st.session_state.stage == 0:
     st.markdown(INSTR_MD)
-    st.text_input("WeChat ID (required for payment via WeChat transfer):",
-                  key="wechat_id")
-
     st.markdown("### Comprehension Check")
     st.radio(
         "1 · To earn points for an item in Stage 2, your chosen interval must contain…",
