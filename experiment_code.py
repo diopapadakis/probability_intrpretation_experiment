@@ -1,29 +1,20 @@
 """
 Streamlit app · Probability-Word Interpretation + “Wavelength” Game
 ------------------------------------------------------------------
-• Data are appended to a Google Sheet (gspread).  
-• Numeric routing 0-1-2-3.  
-• Header row written once so every column (wechat_id, q1_stage1, …) stays aligned.  
-• Question numbers hidden from participants.  
-• Stage-2 page always opens scrolled to the top.  
-• Buttons react on first click (unique keys).  
-• Still migrates any old string-based stage.
+• Appends every submission to a Google Sheet via gspread (with header).  
+• Four numeric stages: 0-intro, 1-stage1, 2-stage2, 3-thanks.  
+• Stage-2 page auto-scrolls to top exactly once.  
+• Buttons react on first click (unique keys + on_click).  
+• Question numbers are hidden from participants.  
+• Runs even without Google-Sheets secrets (useful for local dev).
 """
 
 import streamlit as st
-import pandas as pd
-import datetime
-import random
-import uuid
+import datetime, random, uuid
 import gspread
 from google.oauth2.service_account import Credentials
 
-# ── migrate old cookie values ───────────────────────────────────────────
-_old2num = {"INTRO": 0, "STAGE1": 1, "STAGE2": 2, "THANKS": 3}
-if isinstance(st.session_state.get("stage"), str):
-    st.session_state.stage = _old2num.get(st.session_state.stage, 0)
-
-# ── CONFIG ──────────────────────────────────────────────────────────────
+# ──────────────────────────── CONFIG ────────────────────────────────────
 SENTENCES = [
     "If someone tells you that there is an even chance of something, what probability would you interpret that as?",
     "If someone tells you that something is certain, what probability would you interpret that as?",
@@ -41,103 +32,92 @@ SENTENCES = [
     "If someone tells you an event is consistent with expectations, how likely would you think it is to happen?",
     "If someone tells you there is a highly suspicious chance of an event happening, what probability would you interpret that as?",
 ]
-NUM_Q       = len(SENTENCES)
-QIDS        = list(range(1, NUM_Q + 1))
-NARROW_R    = 3
-WIDE_R      = 6
-NARROW_PTS  = 20
-WIDE_PTS    = 10
-PTS2RMB     = 0.7
-BASE_FEE    = 10
-RAND_ORDER  = True
+NUM_Q        = len(SENTENCES)
+QIDS         = list(range(1, NUM_Q + 1))
+NARROW_R     = 3
+WIDE_R       = 6
+NARROW_PTS   = 20
+WIDE_PTS     = 10
+PTS2RMB      = 0.7
+BASE_FEE_RMB = 10
+RAND_ORDER   = True
 
-# ── Google-Sheets helpers ───────────────────────────────────────────────
-def _get_gsheet_client():
+# ─────────────────── Google-Sheets helpers (optional) ───────────────────
+def _gsheets_ready() -> bool:
+    return "connections" in st.secrets and "gsheets" in st.secrets["connections"]
+
+def _get_ws():
     cfg = st.secrets["connections"]["gsheets"]
-    info = dict(cfg)                    # mutable copy
+    info = {k: v.replace("\\n", "\n") if k == "private_key" else v for k, v in cfg.items()}
     ss_id   = info.pop("spreadsheet_id")
     ws_name = info.pop("worksheet")
-    if "private_key" in info:           # convert \n to real newlines
-        info["private_key"] = info["private_key"].replace("\\n", "\n")
-    creds = Credentials.from_service_account_info(
-        info,
-        scopes=[
-            "https://www.googleapis.com/auth/spreadsheets",
-            "https://www.googleapis.com/auth/drive",
-        ],
-    )
-    return gspread.authorize(creds), ss_id, ws_name
+    creds = Credentials.from_service_account_info(info, scopes=[
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive",
+    ])
+    client = gspread.authorize(creds)
+    return client.open_by_key(ss_id).worksheet(ws_name)
 
 def _ensure_header(ws, cols):
-    first = ws.row_values(1)
-    if not first or first != cols:
-        if first:
-            ws.delete_rows(1)           # remove wrong header
-        ws.insert_row(cols, index=1, value_input_option="RAW")
+    if ws.row_count == 0 or ws.row_values(1) != cols:
+        if ws.row_count:                       # remove wrong header
+            ws.delete_rows(1)
+        ws.insert_row(cols, index=1)
 
-def _save_responses(data: dict[str, str | int]) -> None:
-    cols = (
-        ["participant_id", "timestamp", "wechat_id"]
-        + [f"q{q}_stage1" for q in QIDS]
-        + [f"q{q}_pred"   for q in QIDS]
-        + [f"q{q}_band"   for q in QIDS]
-        + [f"q{q}_low"    for q in QIDS]
-        + [f"q{q}_high"   for q in QIDS]
-    )
-    row = [data.get(c, "") for c in cols]
-
-    client, ss_id, ws_name = _get_gsheet_client()
-    ws = client.open_by_key(ss_id).worksheet(ws_name)
+def _save_row(row, cols):
+    if not _gsheets_ready():
+        st.warning("⚠️ Google-Sheets secrets not set; data not saved.")
+        return
+    ws = _get_ws()
     _ensure_header(ws, cols)
     ws.append_row(row, value_input_option="USER_ENTERED")
 
-# ── Session-state init ──────────────────────────────────────────────────
-def _init_state():
-    st.session_state.stage = 0
+# ─────────────────── Session-state init ─────────────────────────────────
+if "stage" not in st.session_state:
+    st.session_state.stage = 0                       # 0=intro
     st.session_state.pid   = str(uuid.uuid4())
     st.session_state.data  = {
         "participant_id": st.session_state.pid,
         "timestamp": datetime.datetime.now(datetime.timezone.utc)
                                  .isoformat(timespec="seconds"),
     }
-    qlist = list(zip(QIDS, SENTENCES))
+    question_list = list(zip(QIDS, SENTENCES))
     if RAND_ORDER:
-        random.shuffle(qlist)
-    st.session_state.qlist = qlist
-    st.session_state.def1  = {q: random.randrange(0, 101) for q in QIDS}
-    st.session_state.def2  = {q: random.randrange(0, 101) for q in QIDS}
+        random.shuffle(question_list)
+    st.session_state.qlist         = question_list
+    st.session_state.stage1_defaults = {q: random.randint(0, 100) for q in QIDS}
+    st.session_state.stage2_defaults = {q: random.randint(0, 100) for q in QIDS}
 
-if "stage" not in st.session_state:
-    _init_state()
+# ─────────────────── Button helper (single click) ───────────────────────
+def _set_stage(new_stage: int):
+    st.session_state.stage = new_stage
 
-# ── UI screens ──────────────────────────────────────────────────────────
-def run_instructions():
+# ─────────────────── UI screens ─────────────────────────────────────────
+def screen_intro():
     st.markdown("""
-    ### Welcome to this study in experimental economics  
+    ### Probability-Word Interpretation Study  
     **NYU Shanghai · Behavioral & Experimental Economics Lab**
 
-    Duration: 20–30 min — Payment: 10 RMB show-up + bonus from Stage 2.
+    Duration ~20-30 min | Payment 10 RMB show-up + bonus from Stage 2.
 
-    Enter your WeChat ID (leave blank for cash) and click **Begin**.
+    Enter your WeChat ID (leave blank for cash) then click **Begin**.
     """)
-    st.text_input("WeChat ID:", key="wechat_id")
-    if st.button("Begin Stage 1 →", key="go_stage1"):
-        st.session_state.stage = 1
+    st.text_input("WeChat ID", key="wechat_id")
+    st.button("Begin Stage 1 →", key="btn_intro", on_click=_set_stage, args=(1,))
 
-def run_stage1():
+def screen_stage1():
     st.header("Stage 1 – Your own interpretation (0-100)")
     for qid, sentence in st.session_state.qlist:
         key = f"q{qid}_stage1"
-        val = st.slider(sentence, 0, 100, value=st.session_state.def1[qid], key=key)
-        st.session_state.data[key] = val
-    if st.button("Continue to Stage 2 →", key="go_stage2"):
-        st.session_state.stage = 2
-        st.session_state._entered_stage2 = None     # reset scroll flag
+        st.session_state.data[key] = st.slider(
+            sentence, 0, 100, value=st.session_state.stage1_defaults[qid], key=key
+        )
+    st.button("Continue to Stage 2 →", key="btn_s1", on_click=_set_stage, args=(2,))
 
-def run_stage2():
-    if st.session_state.get("_entered_stage2") is None:
+def screen_stage2():
+    # auto-scroll to top once
+    if st.session_state.pop("_first_scroll", True):
         st.components.v1.html("<script>window.scrollTo(0,0);</script>", height=0)
-        st.session_state._entered_stage2 = True
 
     st.header("Stage 2 – Predict the group median")
     st.write(
@@ -146,23 +126,17 @@ def run_stage2():
     )
 
     for qid, sentence in st.session_state.qlist:
-        st.subheader(sentence)                              # no “Qn.” prefix
+        st.subheader(sentence)                    # no “Qn.” prefix
+        pred_key, band_key = f"q{qid}_pred", f"q{qid}_band"
 
-        pred_key = f"q{qid}_pred"
-        band_key = f"q{qid}_band"
-
-        pred = st.slider(
-            "Predict the median (0-100)",
-            0, 100, value=st.session_state.def2[qid], key=pred_key
-        )
+        pred = st.slider("Predict the median (0-100)", 0, 100,
+                         value=st.session_state.stage2_defaults[qid], key=pred_key)
         st.session_state.data[pred_key] = pred
 
         choice = st.radio(
             "Choose band width",
-            (
-                f"Narrow (±{NARROW_R}) — {NARROW_PTS*PTS2RMB:.0f} RMB",
-                f"Wide   (±{WIDE_R}) — {WIDE_PTS*PTS2RMB:.0f} RMB",
-            ),
+            (f"Narrow (±{NARROW_R}) — {NARROW_PTS*PTS2RMB:.0f} RMB",
+             f"Wide   (±{WIDE_R}) — {WIDE_PTS*PTS2RMB:.0f} RMB"),
             key=band_key
         )
         band = "narrow" if choice.startswith("Narrow") else "wide"
@@ -173,28 +147,27 @@ def run_stage2():
         st.session_state.data[f"q{qid}_low"]  = low
         st.session_state.data[f"q{qid}_high"] = high
 
-        st.slider(
-            "Selected interval", 0, 100, value=(low, high),
-            disabled=True, key=f"view_{qid}"
-        )
+        st.slider("Selected interval", 0, 100, (low, high),
+                  disabled=True, key=f"view_{qid}")
 
-    if st.button("Submit all responses", key="submit_final"):
+    if st.button("Submit all responses", key="btn_submit"):
         st.session_state.data["wechat_id"] = st.session_state.get("wechat_id", "")
-        _save_responses(st.session_state.data)
-        st.session_state.stage = 3
+        columns = (
+            ["participant_id", "timestamp", "wechat_id"]
+            + [f"q{q}_stage1" for q in QIDS]
+            + [f"q{q}_pred"   for q in QIDS]
+            + [f"q{q}_band"   for q in QIDS]
+            + [f"q{q}_low"    for q in QIDS]
+            + [f"q{q}_high"   for q in QIDS]
+        )
+        _save_row([st.session_state.data.get(c, "") for c in columns], columns)
+        _set_stage(3)
 
-def run_final():
+def screen_thanks():
     st.success(
         f"Thank you for participating!\n\n"
-        f"You will receive {BASE_FEE} RMB + bonus from five random Stage 2 rounds."
+        f"You will receive **{BASE_FEE_RMB} RMB** plus bonus from five random Stage-2 rounds."
     )
 
-# ── Numeric router 0-1-2-3 ──────────────────────────────────────────────
-if st.session_state.stage == 0:
-    run_instructions()
-elif st.session_state.stage == 1:
-    run_stage1()
-elif st.session_state.stage == 2:
-    run_stage2()
-else:
-    run_final()
+# ─────────────────── Router ─────────────────────────────────────────────
+{0: screen_intro, 1: screen_stage1, 2: screen_stage2}.get(st.session_state.stage, screen_thanks)()
