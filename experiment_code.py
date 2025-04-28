@@ -342,8 +342,7 @@ elif st.session_state.stage == 0:
          "20 points per correct narrow band answer"],
         key="comp_q2")
 
-    st.button("Begin Stage 1 →", on_click=begin_stage1,
-              disabled=st.session_state.get("wechat_id", "") == "")
+    st.button("Begin Stage 1 →", on_click=begin_stage1)
 
 elif st.session_state.stage == 1:
     st.header("Stage 1 – Your Interpretation")
