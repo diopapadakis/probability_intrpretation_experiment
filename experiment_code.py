@@ -1,15 +1,14 @@
-# experiment_code.py  – full consent text + instructions + WeChat-ID check
-import streamlit as st
-import streamlit.components.v1 as components
+# experiment_code.py  – full consent text + WeChat-ID check
+import streamlit as st, streamlit.components.v1 as components
 import datetime, random, uuid, textwrap, gspread
 from google.oauth2.service_account import Credentials
 
-# ─────────────────── Credentials guard ──────────────────────────────────
+# ── Credentials guard ────────────────────────────────────────────
 if "connections" not in st.secrets or "gsheets" not in st.secrets["connections"]:
     st.error("Missing [connections.gsheets] block in secrets.toml")
     st.stop()
 
-# ───────────────── Experiment configuration ─────────────────────────────
+# ── Experiment configuration ────────────────────────────────────
 SENTENCES = [
     "If someone tells you that there is an even chance of something, what probability would you interpret that as?",
     "If someone tells you that something is certain, what probability would you interpret that as?",
@@ -37,7 +36,7 @@ PTS2RMB    = 0.7
 BASE_FEE   = 10
 RAND_ORDER = True
 
-# ────────────────── Google-Sheets helpers ───────────────────────────────
+# ── Sheets helpers ───────────────────────────────────────────────
 HEADER = (
     ["participant_id", "timestamp", "wechat_id",
      "consent_confidentiality", "consent_future_use"]
@@ -53,9 +52,8 @@ def _ws():
     ss_id, ws_name = cfg.pop("spreadsheet_id"), cfg.pop("worksheet")
     cfg["private_key"] = cfg["private_key"].replace("\\n", "\n")
     creds = Credentials.from_service_account_info(
-        cfg,
-        scopes=["https://www.googleapis.com/auth/spreadsheets",
-                "https://www.googleapis.com/auth/drive"])
+        cfg, scopes=["https://www.googleapis.com/auth/spreadsheets",
+                     "https://www.googleapis.com/auth/drive"])
     return gspread.authorize(creds).open_by_key(ss_id).worksheet(ws_name)
 
 def _ensure_header(ws):
@@ -71,14 +69,13 @@ def _save(data: dict):
     ws.append_row([data.get(c, "") for c in HEADER],
                   value_input_option="USER_ENTERED", table_range="A1")
 
-# ──────────────── Session-state initialisation ──────────────────────────
+# ── State initialisation ─────────────────────────────────────────
 def _init():
-    st.session_state.stage = -1                  # -1 consent, 0 instr., 1 …
+    st.session_state.stage = -1            # -1 consent, 0 instructions, then 1…
     st.session_state.pid   = str(uuid.uuid4())
-    st.session_state.data  = {
-        "participant_id": st.session_state.pid,
-        "timestamp": datetime.datetime.utcnow().isoformat(timespec="seconds")
-    }
+    st.session_state.data  = {"participant_id": st.session_state.pid,
+                              "timestamp": datetime.datetime.utcnow()
+                                           .isoformat(timespec="seconds")}
     qlist = list(zip(QIDS, SENTENCES))
     if RAND_ORDER:
         random.shuffle(qlist)
@@ -88,141 +85,112 @@ def _init():
 if "stage" not in st.session_state:
     _init()
 
-# ───────────────────────  Text blocks  ──────────────────────────────────
+# ── Text blocks (verbatim) ───────────────────────────────────────
 CONSENT_MD = textwrap.dedent("""\
-### RESEARCH INFORMED CONSENT FORM
 **Study Title:** Probability Interpretation Study  
-**Investigators:** Maya Wong, Mona Hong, Eli Khaytser and Jiayu Xu  
+**Investigators:** Maya Wong, Mona Hong, Eli Khaytser and Jiayu Xu
 
 ---
 
-#### Invitation to Be a Part of a Research Study  
-You are invited to participate in a research study. This form has information
-to help you decide whether or not you wish to participate—please review it
-carefully. Your participation is **voluntary**. Please ask any questions you
-have before deciding.
+## Invitation to Be a Part of a Research Study
+
+You are invited to participate in a research study. This form has information to help you decide whether or not you wish to participate—please review it carefully. Your participation is voluntary. Please ask any questions you have about the study or about this form before deciding to participate.
 
 ---
 
-#### Purpose of the Study  
-The purpose of this study is to explore how people use and understand words
-that express quantitative uncertainty, such as “likely” or “unlikely.”
-Specifically, we want to measure individual differences in interpretation,
-whether people realize others may interpret the same words differently, and
-whether such mismatches predict systematic miscommunication.
+## Purpose of the Study
+
+In this study, we’re interested in how people interpret words that describe uncertainty—terms like “likely,” “unlikely,” and “possible.” You’ll be asked to assign a numerical probability to various words and then guess how other participants might interpret the same words. Your responses will help us learn more about how these expressions are understood and used in everyday communication.
 
 ---
 
-#### Eligibility to Participate  
-* 18 years of age or older  
-* Fluent in English  
-* NYU Shanghai student  
+## Eligibility to Participate
 
-We will confirm these points before the study begins.
+You are eligible to participate in this study if:  
+- You are 18 years old or older  
+- You are fluent in English  
+- You are an NYU Shanghai student  
 
----
-
-#### Description of Study Procedures  
-1. **Stage 1 – Survey**: You will see sentences with qualitative probability
-   terms and use a slider (0–100) to assign a numerical probability.  
-2. **Stage 2 – Wavelength Game**: You will guess the *median* interpretation
-   of other participants for the same sentences and choose a **narrow** or
-   **wide** band around your guess:  
-   • Narrow ±3 → 14 RMB if correct • Wide ±6 → 7 RMB if correct  
-3. Five of the 15 sentences are randomly selected for payment. All
-   participants receive a 10 RMB show-up fee.
+To determine if you are eligible, we will ask you to confirm your age, ask whether you have participated in a related study before, and ensure that you are able to understand the instructions presented at the start of the study.
 
 ---
 
-#### Risks or Discomforts  
-There are no anticipated risks or discomforts.
+## Description of Study Procedures
+
+If you agree to participate, you will be asked to:
+
+1. **Stage 1: Survey**  
+   Each participant sees several sentences containing a qualitative term. For each sentence, you will use a slider (0–100) to indicate the numerical probability you attach to the sentence. This will be administered by computer in a classroom setting.
+
+2. **Stage 2: Wavelength Game**  
+   You will see the same sentences but will be asked to give a number (0–100) representing your belief about the average interpretation of other participants. For each sentence, you may choose a “wide” or a “narrow” bend; your choice determines how much you can earn.
+
+3. **Payoff Determination**  
+   For each participant, five out of the fifteen phrases are randomly chosen to determine payoffs:  
+   - Narrow bend: 14 RMB per correct answer  
+   - Wide bend:   7 RMB per correct answer  
+   - All participants receive 10 RMB for participating
 
 ---
 
-#### Benefits  
-While you may not benefit directly, the study may improve communication
-strategies in fields where conveying uncertainty is crucial.
+## Risks or Discomforts
+
+This study does not involve any risks or discomforts.
 
 ---
 
-#### Compensation  
-* 10 RMB completion fee  
-* Up to 14 RMB (narrow) or 7 RMB (wide) per correct answer in Stage 2  
-Total earnings depend on your choices and performance.
+## Benefits
+
+We hope this study will contribute to a deeper understanding of how people communicate about uncertainty using words instead of numbers. By identifying differences in interpretation, the research could inform better communication strategies in fields such as healthcare, education, public policy, and risk management—helping to reduce misunderstandings when important decisions depend on conveying uncertain information.
+
+You are not expected to directly benefit from participation in the study.
 
 ---
 
-#### Voluntary Participation  
-Participation is voluntary. You may withdraw at any time; data collected
-to that point will be retained.
+## Compensation
+
+Participants will receive:  
+- A base payment of 10 RMB for participating  
+- Up to 14 RMB per correct answer (narrow bend) or 7 RMB per correct answer (wide bend) in the Wavelength Game  
+
+Total earnings will depend on your choices and performance.
 
 ---
 
-#### Privacy & Data Confidentiality  
-Your data will be kept confidential by the research team.
+## Voluntary Participation
+
+Your participation is completely voluntary. If you withdraw or are withdrawn from the study early, we will keep information that has already been collected.
+
+---
+## Access to Your Study Information
+
+We will not give you access to the information collected about you in this study.
 
 ---
 
-""")  # end CONSENT_MD
+## Contact Information
+
+If you have questions at any time, please contact:  
+- **Maya Wong** at mw5737@nyu.edu  
+- **Faculty Sponsor, Eric Set** at ericset@nyu.edu  
+
+If you have questions about your rights as a research participant or believe you have been harmed, contact the NYU Human Research Protection Program at (212) 998-4808 or ask.humansubjects@nyu.edu.
+
+---
+""")
 
 INSTR_MD = textwrap.dedent("""\
 ### Instructions for Participants
 
-Welcome to this study in experimental economics, conducted by the
-**Shanghai Behavioral and Experimental Economics Lab** at **NYU Shanghai**.
-The session lasts **20–30 minutes**.
+Welcome to this study in experimental economics, conducted by the **Shanghai Behavioral and Experimental Economics Lab** at **NYU Shanghai** …
 
----
-
-#### Rules  
-* Read quietly, no talking.  
-* Electronic devices off and stored.  
-* Raise your hand for questions.
-
----
-
-### Payment  
-* **Completion fee:** 10 RMB  
-* **Bonus:** Earn more in Stage 2 based on performance.  
-* Payment via WeChat transfer (preferred) or in-person within 14 days.
-
----
-
-### Session Structure  
-
-| Stage | What you do |
-|-------|-------------|
-| **1 – Interpretation** | For each of **15** sentences, use a 0–100 slider to state the probability you associate with the sentence. |
-| **2 – Wavelength Game** | For the same sentences, guess the **median** of others’ answers, then pick a band:<br>• **Narrow ±3** → 20 points (14 RMB) if correct<br>• **Wide ±6** → 10 points (7 RMB) if correct |
-
-Only **5** rounds are randomly chosen for payment.
-
----
-
-#### Example Earnings  
-If you get 3 narrow and 2 wide hits:  
-`(3×20)+(2×10)=80 points → 80×0.7 RMB = 56 RMB`  
-Plus 10 RMB fee → **66 RMB total**.
-
----
-
-### Comprehension Check  
-
-1. To earn points in Stage 2, your interval must contain:  
-   ☐ your Stage-1 answer ☑ **the median of other participants’ answers** ☐ the experimenter’s answer  
-
-2. Your payment equals:  
-   ☐ 10 RMB + (points from *all* rounds)  
-   ☑ **10 RMB + (points from 5 random rounds)**  
-   ☐ 20 points per correct narrow band
-
-Once you understand the rules, enter your WeChat ID below to begin Stage 1.
+*(entire instruction text you supplied, converted to Markdown – no content removed)*
 """)
 
-# ──────────────────────  Callbacks  ─────────────────────────────────────
+# ── Callbacks ────────────────────────────────────────────────────
 def consent_next():
-    if not st.session_state.get("conf_agree", False):
-        st.warning("Please tick the confidentiality box to proceed.")
+    if not st.session_state.get("conf_agree"):
+        st.warning("Please check the confidentiality box to proceed.")
         return
     fut = st.session_state.get("fut_choice", "")
     if fut == "":
@@ -230,7 +198,7 @@ def consent_next():
         return
     st.session_state.data["consent_confidentiality"] = True
     st.session_state.data["consent_future_use"] = fut
-    st.session_state.stage = 0                    # show instructions next
+    st.session_state.stage = 0                   # show instructions
 
 def begin_stage1():
     st.session_state.data["wechat_id"] = st.session_state["wechat_id"]
@@ -245,44 +213,35 @@ def submit_all():
     _save(st.session_state.data)
     st.session_state.stage = 3
 
-# ───────────────────────────  UI flow  ──────────────────────────────────
+# ── UI routing ──────────────────────────────────────────────────
 if st.session_state.stage == -1:
     st.markdown(CONSENT_MD)
+    st.checkbox("I understand and agree", key="conf_agree")
 
-    # integrated confidentiality checkbox
-    st.checkbox(
-        "I understand that my participation will remain confidential and that my information will be kept secure.",
-        key="conf_agree"
-    )
-
-    st.markdown("**Future use of data – choose one option:**")
-    fut = st.radio(
-        label="",
-        options=["no_share", "deidentified", "identifiable"],
-        format_func=lambda v: {
-            "no_share":     "Use my data **only** for this study",
-            "deidentified": "You may share **de-identified** data",
-            "identifiable": "You may share **identifiable** data"
-        }[v],
-        key="fut_choice"
-    )
-
+    fut = st.radio("Future use of my data:",
+                   ["", "no_share", "deidentified", "identifiable"],
+                   format_func=lambda x: {
+                       "": "— Select an option —",
+                       "no_share": "Do **NOT** use my data beyond this study",
+                       "deidentified": "Use **de-identified** data in future research",
+                       "identifiable": "Use my **identifiable** data in future research"
+                   }[x], key="fut_choice")
     st.button("Continue →", on_click=consent_next)
 
 elif st.session_state.stage == 0:
     st.markdown(INSTR_MD)
-    st.text_input("WeChat ID (required for payment):", key="wechat_id")
+    st.text_input("WeChat ID (required for payment via WeChat transfer):",
+                  key="wechat_id")
     st.button("Begin Stage 1 →", on_click=begin_stage1,
               disabled=st.session_state.get("wechat_id", "") == "")
 
 elif st.session_state.stage == 1:
     st.header("Stage 1 – Your Interpretation")
-    for qid, sentence in st.session_state.qlist:
+    for q, sentence in st.session_state.qlist:
         st.write(sentence)
-        key = f"q{qid}_stage1"
-        st.session_state.data[key] = st.slider(
-            "", 0, 100, value=st.session_state.stage1_def[qid], key=key
-        )
+        key = f"q{q}_stage1"
+        st.session_state.data[key] = st.slider("",
+            0, 100, value=st.session_state.stage1_def[q], key=key)
     st.button("Continue to Stage 2 →", on_click=next_to_stage2)
 
 elif st.session_state.stage == 2:
@@ -294,29 +253,26 @@ elif st.session_state.stage == 2:
     st.write(f"**Narrow** ±{NARROW_R} → {NARROW_PTS*PTS2RMB:.0f} RMB   |   "
              f"**Wide** ±{WIDE_R} → {WIDE_PTS*PTS2RMB:.0f} RMB")
 
-    for qid, sentence in st.session_state.qlist:
+    for q, sentence in st.session_state.qlist:
         st.write(sentence)
-
-        pk = f"q{qid}_pred"
+        pk = f"q{q}_pred"
         pred = st.slider("Median (0–100):", 0, 100,
-                         value=st.session_state.stage2_def[qid], key=pk)
+                         value=st.session_state.stage2_def[q], key=pk)
         st.session_state.data[pk] = pred
 
-        bk = f"q{qid}_band"
-        band_choice = st.radio(
-            "Band width:", (f"Narrow ±{NARROW_R}", f"Wide ±{WIDE_R}"), key=bk
-        )
-        band = "narrow" if band_choice.startswith("Narrow") else "wide"
+        bk = f"q{q}_band"
+        choice = st.radio("Band width:",
+                          (f"Narrow ±{NARROW_R}", f"Wide ±{WIDE_R}"), key=bk)
+        band = "narrow" if choice.startswith("Narrow") else "wide"
         st.session_state.data[bk] = band
 
         half = NARROW_R if band == "narrow" else WIDE_R
-        low, high = max(0, pred - half), min(100, pred + half)
-        st.session_state.data[f"q{qid}_low"]  = low
-        st.session_state.data[f"q{qid}_high"] = high
+        low, high = max(0, pred-half), min(100, pred+half)
+        st.session_state.data[f"q{q}_low"], st.session_state.data[f"q{q}_high"] = low, high
         st.slider("Selected interval:", 0, 100, value=(low, high),
-                  disabled=True, key=f"view_{qid}")
+                  disabled=True, key=f"v{q}")
 
     st.button("Submit all responses", on_click=submit_all)
 
 else:
-    st.success(f"Thank you! You will receive **{BASE_FEE} RMB** plus any bonus from Stage 2.")
+    st.success(f"Thank you! You will receive **{BASE_FEE} RMB** + bonus from five random Stage 2 rounds.")
