@@ -289,6 +289,7 @@ def consent_next():
     st.session_state.data["consent_future_use"] = fut
     st.session_state.data["wechat_id"] = st.session_state["wechat_id"]
     st.session_state.stage = 0                   # show instructions + comprehension
+    st.session_state._scrolled_instr = False
 
 def begin_stage1():
     # require comprehension answers
@@ -329,6 +330,9 @@ if st.session_state.stage == -1:
     st.button("Continue →", on_click=consent_next)
 
 elif st.session_state.stage == 0:
+    if not st.session_state._scrolled_instr:
+        components.html("<script>window.scrollTo(0,0);</script>", height=0)
+        st.session_state._scrolled_instr = True
     st.markdown(INSTR_MD)
     st.markdown("### Comprehension Check")
     st.radio(
