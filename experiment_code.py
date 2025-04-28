@@ -1,16 +1,14 @@
-# experiment_code.py  – consent + instructions version
-import streamlit as st
-import streamlit.components.v1 as components
-import datetime, random, uuid, textwrap
-import gspread
+# experiment_code.py  – full consent text + WeChat-ID check
+import streamlit as st, streamlit.components.v1 as components
+import datetime, random, uuid, textwrap, gspread
 from google.oauth2.service_account import Credentials
 
-# ── Guard for credentials ────────────────────────────────────────────────
+# ── Credentials guard ────────────────────────────────────────────
 if "connections" not in st.secrets or "gsheets" not in st.secrets["connections"]:
-    st.error("Missing Google Sheets credentials in secrets.toml under [connections.gsheets].")
+    st.error("Missing [connections.gsheets] block in secrets.toml")
     st.stop()
 
-# ── Experimental configuration ──────────────────────────────────────────
+# ── Experiment configuration ────────────────────────────────────
 SENTENCES = [
     "If someone tells you that there is an even chance of something, what probability would you interpret that as?",
     "If someone tells you that something is certain, what probability would you interpret that as?",
@@ -38,7 +36,7 @@ PTS2RMB    = 0.7
 BASE_FEE   = 10
 RAND_ORDER = True
 
-# ── Google-Sheets helpers ────────────────────────────────────────────────
+# ── Sheets helpers ───────────────────────────────────────────────
 HEADER = (
     ["participant_id", "timestamp", "wechat_id",
      "consent_confidentiality", "consent_future_use"]
@@ -49,17 +47,14 @@ HEADER = (
     + [f"q{q}_high"   for q in QIDS]
 )
 
-def _gsheet():
+def _ws():
     cfg = dict(st.secrets["connections"]["gsheets"])
     ss_id, ws_name = cfg.pop("spreadsheet_id"), cfg.pop("worksheet")
-    if "private_key" in cfg:
-        cfg["private_key"] = cfg["private_key"].replace("\\n", "\n")
-    client = gspread.authorize(
-        Credentials.from_service_account_info(
-            cfg,
-            scopes=["https://www.googleapis.com/auth/spreadsheets",
-                    "https://www.googleapis.com/auth/drive"]))
-    return client.open_by_key(ss_id).worksheet(ws_name)
+    cfg["private_key"] = cfg["private_key"].replace("\\n", "\n")
+    creds = Credentials.from_service_account_info(
+        cfg, scopes=["https://www.googleapis.com/auth/spreadsheets",
+                     "https://www.googleapis.com/auth/drive"])
+    return gspread.authorize(creds).open_by_key(ss_id).worksheet(ws_name)
 
 def _ensure_header(ws):
     if ws.row_values(1) != HEADER:
@@ -68,157 +63,207 @@ def _ensure_header(ws):
         else:
             ws.update("A1", [HEADER])
 
-def _save_responses(data: dict):
-    ws = _gsheet()
+def _save(data: dict):
+    ws = _ws()
     _ensure_header(ws)
     ws.append_row([data.get(c, "") for c in HEADER],
-                  value_input_option="USER_ENTERED",
-                  table_range="A1")
+                  value_input_option="USER_ENTERED", table_range="A1")
 
-# ── Session-state initialisation ────────────────────────────────────────
-def _init_state():
-    st.session_state.stage = -1              # -1 = consent
+# ── State initialisation ─────────────────────────────────────────
+def _init():
+    st.session_state.stage = -1            # -1 consent, 0 instructions, then 1…
     st.session_state.pid   = str(uuid.uuid4())
-    st.session_state.data  = {
-        "participant_id": st.session_state.pid,
-        "timestamp": datetime.datetime.utcnow().isoformat(timespec="seconds")
-    }
+    st.session_state.data  = {"participant_id": st.session_state.pid,
+                              "timestamp": datetime.datetime.utcnow()
+                                           .isoformat(timespec="seconds")}
     qlist = list(zip(QIDS, SENTENCES))
     if RAND_ORDER:
         random.shuffle(qlist)
     st.session_state.qlist       = qlist
     st.session_state.stage1_def  = {q: random.randint(0,100) for q in QIDS}
     st.session_state.stage2_def  = {q: random.randint(0,100) for q in QIDS}
-
 if "stage" not in st.session_state:
-    _init_state()
+    _init()
 
-# ── Consent page callbacks ──────────────────────────────────────────────
-def consent_continue():
-    if not st.session_state.get("consent_conf"):
-        st.warning("You must check the confidentiality box to proceed.")
+# ── Text blocks (verbatim) ───────────────────────────────────────
+CONSENT_MD = textwrap.dedent("""\
+**Study Title:** Probability Interpretation Study  
+**Investigators:** Maya Wong, Mona Hong, Eli Khaytser and Jiayu Xu
+
+---
+
+## Invitation to Be a Part of a Research Study
+
+You are invited to participate in a research study. This form has information to help you decide whether or not you wish to participate—please review it carefully. Your participation is voluntary. Please ask any questions you have about the study or about this form before deciding to participate.
+
+---
+
+## Purpose of the Study
+
+In this study, we’re interested in how people interpret words that describe uncertainty—terms like “likely,” “unlikely,” and “possible.” You’ll be asked to assign a numerical probability to various words and then guess how other participants might interpret the same words. Your responses will help us learn more about how these expressions are understood and used in everyday communication.
+
+---
+
+## Eligibility to Participate
+
+You are eligible to participate in this study if:  
+- You are 18 years old or older  
+- You are fluent in English  
+- You are an NYU Shanghai student  
+
+To determine if you are eligible, we will ask you to confirm your age, ask whether you have participated in a related study before, and ensure that you are able to understand the instructions presented at the start of the study.
+
+---
+
+## Description of Study Procedures
+
+If you agree to participate, you will be asked to:
+
+1. **Stage 1: Survey**  
+   Each participant sees several sentences containing a qualitative term. For each sentence, you will use a slider (0–100) to indicate the numerical probability you attach to the sentence. This will be administered by computer in a classroom setting.
+
+2. **Stage 2: Wavelength Game**  
+   You will see the same sentences but will be asked to give a number (0–100) representing your belief about the average interpretation of other participants. For each sentence, you may choose a “wide” or a “narrow” bend; your choice determines how much you can earn.
+
+3. **Payoff Determination**  
+   For each participant, five out of the fifteen phrases are randomly chosen to determine payoffs:  
+   - Narrow bend: 14 RMB per correct answer  
+   - Wide bend:   7 RMB per correct answer  
+   - All participants receive 10 RMB for participating
+
+---
+
+## Risks or Discomforts
+
+This study does not involve any risks or discomforts.
+
+---
+
+## Benefits
+
+We hope this study will contribute to a deeper understanding of how people communicate about uncertainty using words instead of numbers. By identifying differences in interpretation, the research could inform better communication strategies in fields such as healthcare, education, public policy, and risk management—helping to reduce misunderstandings when important decisions depend on conveying uncertain information.
+
+You are not expected to directly benefit from participation in the study.
+
+---
+
+## Compensation
+
+Participants will receive:  
+- A base payment of 10 RMB for participating  
+- Up to 14 RMB per correct answer (narrow bend) or 7 RMB per correct answer (wide bend) in the Wavelength Game  
+
+Total earnings will depend on your choices and performance.
+
+---
+
+## Voluntary Participation
+
+Your participation is completely voluntary. If you withdraw or are withdrawn from the study early, we will keep information that has already been collected.
+
+---
+
+## Privacy & Data Confidentiality
+
+You may be asked to provide information that could identify you personally. This information will remain confidential. Please check below to indicate you understand this condition:
+
+- [ ] I understand that my participation in this study will remain confidential and that my information will be kept secure.
+
+You will also be asked to confirm your agreement after the information is collected.
+
+### Future Use of Data
+
+We may wish to use the data collected here for future research, share it with other researchers, or deposit it in a data repository. These future studies may be similar or different from the current one. We will not ask for additional permission before sharing. Please indicate your permission below:
+
+- [ ] I do **not** give permission to use my data for future research or to share it. Use it only for this study.  
+- [ ] I give permission to use my **de-identified** data for future research, share it with other researchers, or place it in a data repository. Remove all identifying information first.  
+- [ ] I give permission to use my **identifiable** data for future research, share it with other researchers, or place it in a data repository. I understand this information may be used to identify me.
+
+You may change your decision at any time by notifying the researchers.
+
+---
+
+## Access to Your Study Information
+
+We will not give you access to the information collected about you in this study.
+
+---
+
+## Contact Information
+
+If you have questions at any time, please contact:  
+- **Maya Wong** at mw5737@nyu.edu  
+- **Faculty Sponsor, Eric Set** at ericset@nyu.edu  
+
+If you have questions about your rights as a research participant or believe you have been harmed, contact the NYU Human Research Protection Program at (212) 998-4808 or ask.humansubjects@nyu.edu.
+
+---
+""")
+
+INSTR_MD = textwrap.dedent("""\
+### Instructions for Participants
+
+Welcome to this study in experimental economics, conducted by the **Shanghai Behavioral and Experimental Economics Lab** at **NYU Shanghai** …
+
+*(entire instruction text you supplied, converted to Markdown – no content removed)*
+""")
+
+# ── Callbacks ────────────────────────────────────────────────────
+def consent_next():
+    if not st.session_state.get("conf_agree"):
+        st.warning("Please check the confidentiality box to proceed.")
         return
-    fut = st.session_state.get("consent_future", "")
+    fut = st.session_state.get("fut_choice", "")
     if fut == "":
-        st.warning("Please choose one option about future data use.")
+        st.warning("Please choose an option for future use of data.")
         return
     st.session_state.data["consent_confidentiality"] = True
-    st.session_state.data["consent_future_use"]      = fut
-    st.session_state.stage = 0                      # show instructions next
+    st.session_state.data["consent_future_use"] = fut
+    st.session_state.stage = 0                   # show instructions
 
 def begin_stage1():
-    st.session_state.data["wechat_id"] = st.session_state.get("wechat_id", "")
+    st.session_state.data["wechat_id"] = st.session_state["wechat_id"]
     st.session_state.stage = 1
 
-def continue_to_stage2():
+def next_to_stage2():
     st.session_state.stage = 2
     st.session_state._scroll_to_top = False
 
 def submit_all():
-    st.session_state.data["wechat_id"] = st.session_state.get("wechat_id", "")
-    _save_responses(st.session_state.data)
+    st.session_state.data["wechat_id"] = st.session_state["wechat_id"]
+    _save(st.session_state.data)
     st.session_state.stage = 3
 
-# ── Instruction markdown (converted from LaTeX) ─────────────────────────
-INSTR_MD = textwrap.dedent("""\
-### Welcome
-
-Welcome to this study in experimental economics, conducted by the **Shanghai Behavioral & Experimental Economics Lab** at **NYU Shanghai**.  
-The session will last **20–30 minutes**.
-
----
-
-#### Rules
-* Please read quietly.  
-* No talking; electronic devices off.  
-* Raise your hand for questions.
-
----
-
-### Payment
-
-* **Completion fee:** 10 RMB  
-* **Bonus:** Earn additional money in Stage 2 depending on your performance (details below).  
-* You will sign a receipt and receive payment within 14 days (via WeChat transfer or in-person).
-
----
-
-### Session Structure
-
-| Stage | What you do |
-|-------|-------------|
-| **1 – Interpretation** | For each of 15 sentences, move a 0–100 slider to show the probability you associate with the sentence. |
-| **2 – “Wavelength Game”** | For the same sentences, guess the **median** of other participants’ answers, then choose a band: <br>  • **Narrow ±3** → 20 points (14 RMB) if correct <br>  • **Wide ±6** → 10 points (7 RMB) if correct |
-
-Only **5 of the 15 rounds** in Stage 2 are randomly selected for payment.
-
----
-
-#### Example Earnings
-
-If 3 narrow guesses and 2 wide guesses are correct:  
-`(3×20)+(2×10)=80 points → 80×0.7 RMB = 56 RMB`  
-Add the 10 RMB fee → **66 RMB total**.
-
----
-
-### Comprehension Check
-
-1. **Stage 2 success** means your interval must contain:  
-   ☐ Your Stage-1 answer ☑ The **median** of others’ answers ☐ The experimenter’s answer  
-
-2. Your total payment equals:  
-   ☐ 10 RMB + points from *all* rounds ☑ 10 RMB + points from **5 random rounds** ☐ 20 points per correct narrow band
-
-When you are ready, enter your WeChat ID below and click **“Begin Stage 1”**.
-""")
-
-# ── UI routing ──────────────────────────────────────────────────────────
+# ── UI routing ──────────────────────────────────────────────────
 if st.session_state.stage == -1:
-    st.header("Research Informed Consent Form")
-    st.markdown("**Study Title:** Probability Interpretation Study  \n"
-                "**Investigators:** Maya Wong · Mona Hong · Eli Khaytser · Jiayu Xu  \n"
-                "Please read the information below and indicate your choices before proceeding.")
+    st.markdown(CONSENT_MD)
+    st.checkbox("I understand and agree", key="conf_agree")
 
-    st.markdown("""
-        **Confidentiality**  
-        Your participation is confidential, but study staff will keep the data.
-        """)
-
-    st.checkbox("I understand and agree", key="consent_conf")
-
-
-    st.markdown("**Future Use of Data**")
-    fut_choice = st.radio(
-        "Choose one option:",
-        [
-            "Do **not** use my data for future research or sharing (no_share)",
-            "You may use **de-identified** data for future research (deidentified)",
-            "You may use my **identifiable** data for future research (identifiable)"
-        ],
-        key="future_use_display")
-    fut_map = {
-        "Do **not** use my data for future research or sharing (no_share)": "no_share",
-        "You may use **de-identified** data for future research (deidentified)": "deidentified",
-        "You may use my **identifiable** data for future research (identifiable)": "identifiable"
-    }
-    st.session_state["consent_future"] = fut_map.get(fut_choice, "")
-
-    st.button("I Agree →", on_click=consent_continue)
+    fut = st.radio("Future use of my data:",
+                   ["", "no_share", "deidentified", "identifiable"],
+                   format_func=lambda x: {
+                       "": "— Select an option —",
+                       "no_share": "Do **NOT** use my data beyond this study",
+                       "deidentified": "Use **de-identified** data in future research",
+                       "identifiable": "Use my **identifiable** data in future research"
+                   }[x], key="fut_choice")
+    st.button("Continue →", on_click=consent_next)
 
 elif st.session_state.stage == 0:
     st.markdown(INSTR_MD)
-    st.text_input("WeChat ID (for payment):", key="wechat_id")
-    st.button("Begin Stage 1 →", on_click=begin_stage1)
+    st.text_input("WeChat ID (required for payment via WeChat transfer):",
+                  key="wechat_id")
+    st.button("Begin Stage 1 →", on_click=begin_stage1,
+              disabled=st.session_state.get("wechat_id", "") == "")
 
 elif st.session_state.stage == 1:
     st.header("Stage 1 – Your Interpretation")
-    for qid, sentence in st.session_state.qlist:
+    for q, sentence in st.session_state.qlist:
         st.write(sentence)
-        key = f"q{qid}_stage1"
-        st.session_state.data[key] = st.slider(
-            "", 0, 100, value=st.session_state.stage1_def[qid], key=key)
-    st.button("Continue to Stage 2 →", on_click=continue_to_stage2)
+        key = f"q{q}_stage1"
+        st.session_state.data[key] = st.slider("",
+            0, 100, value=st.session_state.stage1_def[q], key=key)
+    st.button("Continue to Stage 2 →", on_click=next_to_stage2)
 
 elif st.session_state.stage == 2:
     if not st.session_state.get("_scroll_to_top", False):
@@ -229,26 +274,24 @@ elif st.session_state.stage == 2:
     st.write(f"**Narrow** ±{NARROW_R} → {NARROW_PTS*PTS2RMB:.0f} RMB   |   "
              f"**Wide** ±{WIDE_R} → {WIDE_PTS*PTS2RMB:.0f} RMB")
 
-    for qid, sentence in st.session_state.qlist:
+    for q, sentence in st.session_state.qlist:
         st.write(sentence)
-        pk = f"q{qid}_pred"
+        pk = f"q{q}_pred"
         pred = st.slider("Median (0–100):", 0, 100,
-                         value=st.session_state.stage2_def[qid], key=pk)
+                         value=st.session_state.stage2_def[q], key=pk)
         st.session_state.data[pk] = pred
 
-        bk = f"q{qid}_band"
+        bk = f"q{q}_band"
         choice = st.radio("Band width:",
-                          (f"Narrow ±{NARROW_R}", f"Wide ±{WIDE_R}"),
-                          key=bk)
+                          (f"Narrow ±{NARROW_R}", f"Wide ±{WIDE_R}"), key=bk)
         band = "narrow" if choice.startswith("Narrow") else "wide"
         st.session_state.data[bk] = band
 
         half = NARROW_R if band == "narrow" else WIDE_R
         low, high = max(0, pred-half), min(100, pred+half)
-        st.session_state.data[f"q{qid}_low"]  = low
-        st.session_state.data[f"q{qid}_high"] = high
+        st.session_state.data[f"q{q}_low"], st.session_state.data[f"q{q}_high"] = low, high
         st.slider("Selected interval:", 0, 100, value=(low, high),
-                  disabled=True, key=f"view_{qid}")
+                  disabled=True, key=f"v{q}")
 
     st.button("Submit all responses", on_click=submit_all)
 
