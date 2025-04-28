@@ -216,15 +216,14 @@ def submit_all():
 # ── UI routing ──────────────────────────────────────────────────
 if st.session_state.stage == -1:
     st.markdown(CONSENT_MD)
-    st.checkbox("I understand and agree", key="conf_agree")
+    st.checkbox("I understand that my participation in this study will remain confidential but my information is going to be kept in the study", key="conf_agree")
 
-    fut = st.radio("Future use of my data:",
-                   ["", "no_share", "deidentified", "identifiable"],
+    fut = st.radio("We may wish to use information about you collected for this study for future research, share it with other researchers, or place it in a data repository. These studies may be similar to this study or completely different. We will not ask for your additional permission before sharing this information. Please indicate below your permissions regarding this use of your information:",
+                   ["no_share", "deidentified", "identifiable"],
                    format_func=lambda x: {
-                       "": "— Select an option —",
-                       "no_share": "Do **NOT** use my data beyond this study",
-                       "deidentified": "Use **de-identified** data in future research",
-                       "identifiable": "Use my **identifiable** data in future research"
+                       "no_share": "I do not give permission to use my data for future research or to share it with other researchers. Use it only for this research study.",
+                       "deidentified": "I give permission to use my de-identified data for future research, share it with other researchers, or place it in a data repository. Remove all information that could identify me before sharing or using the data.",
+                       "identifiable": "I give permission to use my identifiable data for future research, share it with other researchers, or place it in a data repository. I understand that this information may be used to identify me personally."
                    }[x], key="fut_choice")
     st.button("Continue →", on_click=consent_next)
 
