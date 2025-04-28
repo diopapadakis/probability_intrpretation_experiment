@@ -180,11 +180,13 @@ if st.session_state.stage == -1:
                 "**Investigators:** Maya Wong · Mona Hong · Eli Khaytser · Jiayu Xu  \n"
                 "Please read the information below and indicate your choices before proceeding.")
 
-    st.markdown("**Confidentiality**  
-    Your participation is confidential, but study staff will keep the data.  \n"
-                "☑ I understand that my participation will remain confidential but my information will be kept in the study.",
-                unsafe_allow_html=True)
+    st.markdown("""
+        **Confidentiality**  
+        Your participation is confidential, but study staff will keep the data.
+        """)
+
     st.checkbox("I understand and agree", key="consent_conf")
+
 
     st.markdown("**Future Use of Data**")
     fut_choice = st.radio(
