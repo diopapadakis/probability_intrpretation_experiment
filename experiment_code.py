@@ -168,9 +168,6 @@ We will not give you access to the information collected about you in this study
 If you have questions at any time, please contact:  
 - **Maya Wong** at mw5737@nyu.edu  
 - **Faculty Sponsor, Eric Set** at ericset@nyu.edu  
-
-If you have questions about your rights as a research participant or believe you have been harmed, contact the NYU Human Research Protection Program at (212) 998-4808 or ask.humansubjects@nyu.edu.
-
 ---
 """)
 
