@@ -388,7 +388,24 @@ elif st.session_state.stage == 2:
         st.slider("Selected interval:", 0, 100, value=(low, high),
                   disabled=True, key=f"v{q}")
 
-    st.button("Submit all responses", on_click=submit_all)
+    if st.button("Submit all responses", key="submit_main"):
+    st.session_state.want_submit_confirm = True
+
+    # 2️⃣  Show inline confirmation only when flag is on
+    if st.session_state.want_submit_confirm:
+        st.warning("Submit now? You will **not** be able to change any answers after submission.")
+        col1, col2 = st.columns(2)
+    
+        with col1:
+            # Unique key prevents duplicate-ID errors
+            if st.button("Yes, submit", key="submit_yes"):
+                submit_all()                          # save + go to thanks screen
+                st.session_state.want_submit_confirm = False
+    
+        with col2:
+            if st.button("No, go back", key="submit_no"):
+                st.session_state.want_submit_confirm = False
+
 
 else:
     st.success(f"Thank you! You will receive **{BASE_FEE} RMB** + bonus from five random Stage 2 rounds.")
