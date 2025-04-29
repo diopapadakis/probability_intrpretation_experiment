@@ -357,6 +357,7 @@ elif st.session_state.stage == 1:
             if st.button("Yes, proceed", key="stage1_yes"):
                 st.session_state.stage = 2
                 st.session_state.want_stage2_confirm = False
+                st.experimental_rerun()
         with col2:
             if st.button("No, stay here", key="stage1_no"):
                 st.session_state.want_stage2_confirm = False
@@ -401,7 +402,7 @@ elif st.session_state.stage == 2:
             if st.button("Yes, submit", key="submit_yes"):
                 submit_all()                          # save + go to thanks screen
                 st.session_state.want_submit_confirm = False
-    
+                st.experimental_rerun() 
         with col2:
             if st.button("No, go back", key="submit_no"):
                 st.session_state.want_submit_confirm = False
