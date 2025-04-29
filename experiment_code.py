@@ -18,14 +18,19 @@ SENTENCES = [
     "If someone tells you that an event is highly probable, what probability would you interpret that as?",
     "If someone tells you that an event happens infrequently, how likely would you think it is to happen?",
     "If someone tells you that an event happens frequently, how likely would you think it is to happen?",
-    "If someone tells you that there is a fighting chance of something happening, what probability would you interpret that as?",
     "If someone tells you an event is very likely, what probability would you interpret that as?",
     "If someone tells you an event is very unlikely, what probability would you interpret that as?",
     "If someone tells you there is a fair chance of an event happening, what probability would you interpret that as?",
     "If someone tells you an event is likely, what probability would you interpret that as?",
     "If someone tells you an event is unlikely, what probability would you interpret that as?",
-    "If someone tells you an event is consistent with expectations, how likely would you think it is to happen?",
-    "If someone tells you there is a highly suspicious chance of an event happening, what probability would you interpret that as?"
+    "If someone tells you an event is expected, how likely would you think it is to happen?",
+    "If someone tells you that an event could happen, what probability would you interpret that as?",
+    "If someone tells you that some event might happen, how likely would you think it is to happen?",
+    "If someone tells you that something is uncertain, what probability would you interpret that as?",
+    "If someone tells you that there is a remote chance of something happening, how likely is this event?",
+    "If someone tells you that an event is improbable, what probability would you interpret that as?",
+    "If someone tells you that something will definitely happen, what probability would you interpret that as?",
+    "If someone tells you that something will never happen, what probability would you interpret that as?"
 ]
 NUM_Q      = len(SENTENCES)
 QIDS       = list(range(1, NUM_Q + 1))
