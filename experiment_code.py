@@ -1,5 +1,6 @@
 #Issues now: WeChat ID is not actually recorded (it is blank on the google sheets file).
 #You have to scroll up in parts 2 and 4 (instructions and second set of questions)
+#TO DO: ask for confirmation before proceeding.
 import streamlit as st, streamlit.components.v1 as components
 import datetime, random, uuid, textwrap, gspread
 from google.oauth2.service_account import Credentials
