@@ -385,7 +385,7 @@ elif st.session_state.stage == 2:
 
         bk = f"q{q}_band"
         choice = st.radio("Band width:",
-                          (f"Narrow ±{NARROW_R}", f"Wide ±{WIDE_R}"), key=bk)
+                          (f"Narrow ±{NARROW_R} (14 RMB)", f"Wide ±{WIDE_R} (7RMB)"), key=bk)
         band = "narrow" if choice.startswith("Narrow") else "wide"
         st.session_state.data[bk] = band
 
