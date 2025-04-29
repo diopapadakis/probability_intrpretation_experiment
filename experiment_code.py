@@ -81,8 +81,6 @@ def _save(data: dict):
 
 # ── State initialisation ─────────────────────────────────────────
 def _init():
-    st.session_state.want_stage2_confirm  = False   # ask before leaving Stage 1
-    st.session_state.want_submit_confirm  = False   # ask before final submit
     st.session_state.stage = -1            # -1 consent, 0 instructions+check, 1…
     st.session_state.pid   = str(uuid.uuid4())
     st.session_state.data  = {"participant_id": st.session_state.pid,
@@ -95,6 +93,8 @@ def _init():
     st.session_state.stage1_def  = {q: random.randint(0,100) for q in QIDS}
     st.session_state.stage2_def  = {q: random.randint(0,100) for q in QIDS}
     st.session_state["wechat_id"] = ""
+    st.session_state.want_stage2_confirm  = False   # ask before leaving Stage 1
+    st.session_state.want_submit_confirm  = False   # ask before final submit
 if "stage" not in st.session_state:
     _init()
 
@@ -350,19 +350,19 @@ elif st.session_state.stage == 1:
         st.session_state.want_stage2_confirm = True
 
     # … then, if flag is on, show a modal
+    if st.button("Continue to Stage 2 →"):
+        st.session_state.want_stage2_confirm = True
+
     if st.session_state.want_stage2_confirm:
-        with st.dialog("Confirm and proceed to Stage 2"):
-            st.markdown(
-                "You will **not** be able to return to Stage 1 once you continue. "
-                "Are you sure you want to proceed?")
-            col1, col2 = st.columns(2)
-            with col1:
-                if st.button("Yes, proceed"):
-                    st.session_state.stage = 2      # advance
-                    st.session_state.want_stage2_confirm = False
-            with col2:
-                if st.button("No, stay here"):
-                    st.session_state.want_stage2_confirm = False
+        st.warning("You will **not** be able to return to Stage 1 once you continue.")
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("Yes, proceed", key="stage1_yes"):
+                st.session_state.stage = 2          # advance
+                st.session_state.want_stage2_confirm = False
+        with col2:
+            if st.button("No, stay here", key="stage1_no"):
+                st.session_state.want_stage2_confirm = False
 
 
 elif st.session_state.stage == 2:
