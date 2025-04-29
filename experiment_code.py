@@ -81,6 +81,8 @@ def _save(data: dict):
 
 # ── State initialisation ─────────────────────────────────────────
 def _init():
+    st.session_state.want_stage2_confirm  = False   # ask before leaving Stage 1
+    st.session_state.want_submit_confirm  = False   # ask before final submit
     st.session_state.stage = -1            # -1 consent, 0 instructions+check, 1…
     st.session_state.pid   = str(uuid.uuid4())
     st.session_state.data  = {"participant_id": st.session_state.pid,
@@ -364,7 +366,23 @@ elif st.session_state.stage == 1:
         key = f"q{q}_stage1"
         st.session_state.data[key] = st.slider("",
             0, 100, value=st.session_state.stage1_def[q], key=key)
-    st.button("Continue to Stage 2 →", on_click=next_to_stage2)
+    if st.button("Continue to Stage 2 →"):
+        st.session_state.want_stage2_confirm = True
+
+    # … then, if flag is on, show a modal
+    if st.session_state.want_stage2_confirm:
+        with st.modal("Confirm and proceed to Stage 2"):
+            st.markdown(
+                "You will **not** be able to return to Stage 1 once you continue. "
+                "Are you sure you want to proceed?")
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("Yes, proceed"):
+                    st.session_state.stage = 2      # advance
+                    st.session_state.want_stage2_confirm = False
+            with col2:
+                if st.button("No, stay here"):
+                    st.session_state.want_stage2_confirm = False
 
 elif st.session_state.stage == 2:
     components.html("<script>window.scrollTo(0,0);</script>", height=0)
