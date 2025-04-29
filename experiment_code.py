@@ -389,7 +389,7 @@ elif st.session_state.stage == 2:
                   disabled=True, key=f"v{q}")
 
     if st.button("Submit all responses", key="submit_main"):
-    st.session_state.want_submit_confirm = True
+        st.session_state.want_submit_confirm = True
 
     # 2️⃣  Show inline confirmation only when flag is on
     if st.session_state.want_submit_confirm:
