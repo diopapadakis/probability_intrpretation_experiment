@@ -346,13 +346,6 @@ elif st.session_state.stage == 1:
         st.session_state.data[key] = st.slider("",
             0, 100, value=st.session_state.stage1_def[q], key=key)
         # 2-step confirmation: first set a flag …
-    if st.button("Continue to Stage 2 →"):
-        st.session_state.want_stage2_confirm = True
-
-    # … then, if flag is on, show a modal
-    if st.button("Continue to Stage 2 →"):
-        st.session_state.want_stage2_confirm = True
-
     if st.button("Continue to Stage 2 →", key="cont_stage1"):
         st.session_state.want_stage2_confirm = True
     
@@ -367,7 +360,6 @@ elif st.session_state.stage == 1:
         with col2:
             if st.button("No, stay here", key="stage1_no"):
                 st.session_state.want_stage2_confirm = False
-
 
 
 elif st.session_state.stage == 2:
