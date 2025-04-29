@@ -12,28 +12,29 @@ if "connections" not in st.secrets or "gsheets" not in st.secrets["connections"]
     st.stop()
 
 # ── Experiment configuration ────────────────────────────────────
-SENTENCES = [
-    "If someone tells you that there is an even chance of something, what probability would you interpret that as?",
-    "If someone tells you that something is certain, what probability would you interpret that as?",
-    "If someone tells you that an event is impossible, what probability would you interpret that as?",
-    "If someone tells you there is a pretty good chance of something happening, what probability would you interpret that as?",
-    "If someone tells you that an event is highly probable, what probability would you interpret that as?",
-    "If someone tells you that an event happens infrequently, how likely would you think it is to happen?",
-    "If someone tells you that an event happens frequently, how likely would you think it is to happen?",
-    "If someone tells you an event is very likely, what probability would you interpret that as?",
-    "If someone tells you an event is very unlikely, what probability would you interpret that as?",
-    "If someone tells you there is a fair chance of an event happening, what probability would you interpret that as?",
-    "If someone tells you an event is likely, what probability would you interpret that as?",
-    "If someone tells you an event is unlikely, what probability would you interpret that as?",
-    "If someone tells you an event is expected, how likely would you think it is to happen?",
-    "If someone tells you that an event could happen, what probability would you interpret that as?",
-    "If someone tells you that some event might happen, how likely would you think it is to happen?",
-    "If someone tells you that something is uncertain, what probability would you interpret that as?",
-    "If someone tells you that there is a remote chance of something happening, how likely is this event?",
-    "If someone tells you that an event is improbable, what probability would you interpret that as?",
-    "If someone tells you that something will definitely happen, what probability would you interpret that as?",
-    "If someone tells you that something will never happen, what probability would you interpret that as?"
+SENTENCES =[
+    "Certain",
+    "Definitely happen",
+    "Expected",
+    "Highly probable",
+    "Very likely",
+    "A pretty good chance",
+    "Likely",
+    "A fair chance",
+    "Frequently",
+    "An even chance",
+    "Could happen",
+    "Might happen",
+    "Uncertain",
+    "Infrequently",
+    "Unlikely",
+    "Very unlikely",
+    "A remote chance",
+    "Improbable",
+    "Impossible",
+    "Never happen"
 ]
+
 NUM_Q      = len(SENTENCES)
 QIDS       = list(range(1, NUM_Q + 1))
 NARROW_R   = 3
@@ -357,7 +358,7 @@ elif st.session_state.stage == 0:
 
 elif st.session_state.stage == 1:
     components.html("<script>window.scrollTo(0,0);</script>", height=0)
-    st.header("Stage 1 – Your Interpretation")
+    st.header("Stage 1 – Your Interpretation\n Assign a probability (0-100%) to each phrase:")
     for q, sentence in st.session_state.qlist:
         st.write(sentence)
         key = f"q{q}_stage1"
@@ -368,7 +369,7 @@ elif st.session_state.stage == 1:
 elif st.session_state.stage == 2:
     components.html("<script>window.scrollTo(0,0);</script>", height=0)
 
-    st.header("Stage 2 – Predict the Group Median")
+    st.header("Stage 2 – Predict the Group Median\n For each statement, try to guess the median answer of other particiants:")
     st.write(f"**Narrow** ±{NARROW_R} → {NARROW_PTS*PTS2RMB:.0f} RMB   |   "
              f"**Wide** ±{WIDE_R} → {WIDE_PTS*PTS2RMB:.0f} RMB")
 
