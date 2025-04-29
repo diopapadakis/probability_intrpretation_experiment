@@ -308,7 +308,6 @@ def next_to_stage2():
     st.session_state._scroll_to_top = False
 
 def submit_all():
-    st.session_state.data["wechat_id"] = st.session_state.get("wechat_id", "")
     _save(st.session_state.data)
     st.session_state.stage = 3
 
