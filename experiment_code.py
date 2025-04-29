@@ -128,24 +128,6 @@ To determine if you are eligible, we will ask you to confirm your age, ask wheth
 
 ---
 
-## Description of Study Procedures
-
-If you agree to participate, you will be asked to:
-
-1. **Stage 1: Survey**  
-   Each participant sees several sentences containing a qualitative term. For each sentence, you will use a slider (0–100) to indicate the numerical probability you attach to the sentence. This will be administered by computer in a classroom setting.
-
-2. **Stage 2: Wavelength Game**  
-   You will see the same sentences but will be asked to give a number (0–100) representing your belief about the average interpretation of other participants. For each sentence, you may choose a “wide” or a “narrow” bend; your choice determines how much you can earn.
-
-3. **Payoff Determination**  
-   For each participant, five out of the fifteen phrases are randomly chosen to determine payoffs:  
-   - Narrow bend: 14 RMB per correct answer  
-   - Wide bend:   7 RMB per correct answer  
-   - All participants receive 10 RMB for participating
-
----
-
 ## Risks or Discomforts
 
 This study does not involve any risks or discomforts.
