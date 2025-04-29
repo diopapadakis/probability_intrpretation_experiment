@@ -300,6 +300,15 @@ def submit_all():
     _save(st.session_state.data)
     st.session_state.stage = 3
 
+def _stage1_yes():
+    st.session_state.stage = 2
+    st.session_state.want_stage2_confirm = False
+    
+def _submit_yes():
+    submit_all()                           # saves + sets stage = 3
+    st.session_state.want_submit_confirm = False
+
+
 # ── UI routing ──────────────────────────────────────────────────
 if st.session_state.stage == -1:
     st.markdown(CONSENT_MD)
@@ -349,18 +358,15 @@ elif st.session_state.stage == 1:
     if st.button("Continue to Stage 2 →", key="cont_stage1"):
         st.session_state.want_stage2_confirm = True
     
+    # show inline confirmation
     if st.session_state.want_stage2_confirm:
         st.warning("You will **not** be able to return to Stage 1 once you continue.")
         col1, col2 = st.columns(2)
-    
         with col1:
-            if st.button("Yes, proceed", key="stage1_yes"):
-                st.session_state.stage = 2
-                st.session_state.want_stage2_confirm = False
-                st.experimental_rerun()
+            st.button("Yes, proceed", key="stage1_yes", on_click=_stage1_yes)
         with col2:
-            if st.button("No, stay here", key="stage1_no"):
-                st.session_state.want_stage2_confirm = False
+            st.button("No, stay here", key="stage1_no",
+                      on_click=lambda: st.session_state.update(want_stage2_confirm=False))
 
 
 elif st.session_state.stage == 2:
@@ -391,21 +397,16 @@ elif st.session_state.stage == 2:
 
     if st.button("Submit all responses", key="submit_main"):
         st.session_state.want_submit_confirm = True
-
-    # 2️⃣  Show inline confirmation only when flag is on
+    
+    # confirmation block
     if st.session_state.want_submit_confirm:
         st.warning("Submit now? You will **not** be able to change any answers after submission.")
         col1, col2 = st.columns(2)
-    
         with col1:
-            # Unique key prevents duplicate-ID errors
-            if st.button("Yes, submit", key="submit_yes"):
-                submit_all()                          # save + go to thanks screen
-                st.session_state.want_submit_confirm = False
-                st.experimental_rerun() 
+            st.button("Yes, submit", key="submit_yes", on_click=_submit_yes)
         with col2:
-            if st.button("No, go back", key="submit_no"):
-                st.session_state.want_submit_confirm = False
+            st.button("No, go back", key="submit_no",
+                      on_click=lambda: st.session_state.update(want_submit_confirm=False))
 
 
 else:
