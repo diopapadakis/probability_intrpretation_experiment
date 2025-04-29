@@ -353,16 +353,21 @@ elif st.session_state.stage == 1:
     if st.button("Continue to Stage 2 →"):
         st.session_state.want_stage2_confirm = True
 
+    if st.button("Continue to Stage 2 →", key="cont_stage1"):
+        st.session_state.want_stage2_confirm = True
+    
     if st.session_state.want_stage2_confirm:
         st.warning("You will **not** be able to return to Stage 1 once you continue.")
         col1, col2 = st.columns(2)
+    
         with col1:
             if st.button("Yes, proceed", key="stage1_yes"):
-                st.session_state.stage = 2          # advance
+                st.session_state.stage = 2
                 st.session_state.want_stage2_confirm = False
         with col2:
             if st.button("No, stay here", key="stage1_no"):
                 st.session_state.want_stage2_confirm = False
+
 
 
 elif st.session_state.stage == 2:
